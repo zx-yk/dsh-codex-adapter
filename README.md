@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>A <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> plugin: dispatch work to DSH agents from Claude Code / Codex / Antigravity / Grok, without giving up the host's native subagent UI.</strong><br />
+  <strong>Claude Code / Codex can dispatch tasks to DSH agents and see them as native subagents in the host with live progress. Configure dispatch defaults, execution mode, and vision / image-generation access, then install into the host in one click.</strong><br />
   <sub>Native Progress UI &bull; Tier Policy &amp; Escalation &bull; Dispatch Guardrails &bull; Jobs Board &bull; In-Host DSH Sessions &bull; Vision &amp; Image Gen (Native-First) &bull; One-Click Install</sub>
 </p>
 

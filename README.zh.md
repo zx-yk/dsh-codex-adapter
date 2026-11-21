@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 插件：在 Claude Code / Codex / Antigravity / Grok 里把活派给 DSH agent，同时保留宿主原生的子代理界面。</strong><br />
+  <strong>Claude Code / Codex 可以给 DSH agent 分派任务，在宿主里显示为原生子代理、进度可见。配置派发默认值、执行方式，以及接入视觉与生图能力，一键装进宿主。</strong><br />
   <sub>原生进度 UI &bull; 档位策略与失败升档 &bull; 派发护栏 &bull; 任务看板 &bull; DSH 会话进宿主 &bull; 原生优先视觉与生图 &bull; 一键安装</sub>
 </p>
 

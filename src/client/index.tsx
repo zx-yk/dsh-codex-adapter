@@ -86,7 +86,7 @@ const COPY = {
   zh: {
     label: 'DSH Adapter',
     title: 'DSH Adapter',
-    intro: '把 Claude Code / Codex 的子任务派给本实例的 DSH agent，在宿主里显示为原生子代理、进度可见。配置派发默认值、执行方式，以及接入视觉与生图能力，一键装进宿主。',
+    intro: 'Claude Code / Codex 可以给 DSH agent 分派任务，在宿主里显示为原生子代理、进度可见。配置派发默认值、执行方式，以及接入视觉与生图能力，一键装进宿主。',
     integrations: '集成',
     collapse: '折叠', expand: '展开',
     installed: '已安装', notInstalled: '未安装', hud: 'HUD 段',
@@ -179,7 +179,7 @@ const COPY = {
   en: {
     label: 'DSH Adapter',
     title: 'DSH Adapter',
-    intro: 'Dispatch Claude Code / Codex subtasks to DSH agents within this instance, displayed as native subagents in the host with live progress. Configure dispatch defaults, execution mode, and vision/image generation (via subscription CLI or your own OpenAI API), then one-click install into the host.',
+    intro: 'Claude Code / Codex can dispatch tasks to DSH agents and see them as native subagents in the host with live progress. Configure dispatch defaults, execution mode, and vision / image-generation access, then install into the host in one click.',
     integrations: 'Integrations',
     collapse: 'Collapse', expand: 'Expand',
     installed: 'installed', notInstalled: 'not installed', hud: 'HUD segment',

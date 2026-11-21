@@ -1,9 +1,9 @@
 {
   "name": "@zoraxylia/dsh-codex-adapter",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "main": "./src/hub/index.mjs",
-  "description": "DeepSeek Harness plugin: dispatch work to DSH agents from Claude Code / Codex, as native subagents with live progress",
+  "description": "Dispatch tasks from Claude Code / Codex to DSH agents as native subagents with live progress; configure dispatch defaults, execution mode, and vision / image-generation access, installed into the host in one click.",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
