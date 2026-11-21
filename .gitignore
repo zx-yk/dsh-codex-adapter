@@ -4,7 +4,7 @@ node_modules/
 .DS_Store
 
 # Local machine state, never part of the plugin:
-# credentials live in ~/.config/dsh-crew/.env
+# credentials live in ~/.config/dsh-adapter/.env
 
 # logo design iterations stay local
-docs/images/dsh-crew-logo-v*.png
+docs/images/dsh-adapter-logo-v*.png

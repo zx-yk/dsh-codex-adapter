@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
-  <sub>Independent fork of <a href="https://github.com/ZSeven-W/dsh-crew">dsh-crew</a> (MIT) &mdash; see <a href="./NOTICE">NOTICE</a>.</sub>
+  <sub>Independent fork of <a href="https://github.com/ZSeven-W/dsh-crew">dsh-adapter</a> (MIT) &mdash; see <a href="./NOTICE">NOTICE</a>.</sub>
 </p>
 
 <p align="center">
@@ -28,13 +28,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew — settings page" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
-<p align="center"><sub>The DSH Crew settings page — host integrations, dispatch policy, execution and the multimodal bridge</sub></p>
+<p align="center"><sub>The DSH Adapter settings page — host integrations, dispatch policy, execution and the multimodal bridge</sub></p>
 
-## Why DSH Crew
+## Why DSH Adapter
 
-DSH Crew is a plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) — an open-source agent harness. It makes DSH agents dispatchable from Claude Code, Codex, Antigravity and Grok: the orchestrator keeps its own model, the work runs on a real DSH agent with that harness's tools, sandbox, presets and session history, and the host still shows it as a native subagent with live progress.
+DSH Adapter is a plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) — an open-source agent harness. It makes DSH agents dispatchable from Claude Code, Codex, Antigravity and Grok: the orchestrator keeps its own model, the work runs on a real DSH agent with that harness's tools, sandbox, presets and session history, and the host still shows it as a native subagent with live progress.
 
 What runs the work is a DSH agent, not a bare model call. Tiers (`flash` / `pro`) select how much capability that agent gets from the harness's configured roster — DeepSeek V4 Flash and V4 Pro today — so a change of model in DSH needs no change here.
 
@@ -83,7 +83,7 @@ Every dispatch is checked before anything spawns. Worker→worker nesting is cap
 
 ### 📋 Jobs Board
 
-The DSH Crew panel doubles as a jobs board: every worker job — running or finished — is listed with tier, effort, live progress and tokens, held workspaces show their holders, and a job that vanishes mid-flight (e.g. a hub restart) is surfaced as an orphan ghost instead of disappearing silently.
+The DSH Adapter panel doubles as a jobs board: every worker job — running or finished — is listed with tier, effort, live progress and tokens, held workspaces show their holders, and a job that vanishes mid-flight (e.g. a hub restart) is surfaced as an orphan ghost instead of disappearing silently.
 
 </td>
 </tr>
@@ -122,14 +122,14 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Dispatch fans out. Below, eighteen workers translate this README in parallel: the host counts them as its own subagents, while the harness runs them as real sessions.
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>Claude Code sees dsh-crew workers as native subagents, with a statusline segment tracking running tiers, elapsed time and tokens.</sub></p>
+<p align="center"><sub>Claude Code sees dsh-adapter workers as native subagents, with a statusline segment tracking running tiers, elapsed time and tokens.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>The DSH Crew panel sees the same run from the harness side: which host dispatched each job, its tier and effort, live progress and token usage.</sub></p>
+<p align="center"><sub>The DSH Adapter panel sees the same run from the harness side: which host dispatched each job, its tier and effort, live progress and token usage.</sub></p>
 
 <p align="center"><sub>The panel is also the jobs board: running and finished jobs stay listed with tier, progress and tokens, held workspaces name their holders, and a job that vanishes mid-flight (a hub restart) surfaces as an orphan ghost instead of disappearing silently.</sub></p>
 
@@ -145,7 +145,7 @@ dsh web
 Or, for local development straight from the source tree:
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -155,7 +155,7 @@ The `link:` protocol symlinks the profile dependency to this repository, so rebu
 
 In hub mode — the installation above — workers run inside the DSH instance and use the DeepSeek credentials it is already configured with. Nothing else to set up.
 
-Only the standalone fallback needs a key of its own: dispatching from a host with no DSH instance running launches a worker runtime as a separate process. Obtain an API key from [platform.deepseek.com](https://platform.deepseek.com) and write it to `~/.config/dsh-crew/.env`:
+Only the standalone fallback needs a key of its own: dispatching from a host with no DSH instance running launches a worker runtime as a separate process. Obtain an API key from [platform.deepseek.com](https://platform.deepseek.com) and write it to `~/.config/dsh-adapter/.env`:
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -169,7 +169,7 @@ node scripts/smoke.mjs
 
 The smoke test dispatches one cheap job through whichever path is available — the hub when a DSH instance is running, standalone otherwise — and prints which one it used. Within about ten seconds you should see `smoke test passed — configuration OK`. On failure the reason is printed, scoped to the path that was tested.
 
-Then open Settings → DSH Crew and install the host integrations — Claude Code, Codex, Antigravity, Grok — with one click, or drive the same installer from the command line:
+Then open Settings → DSH Adapter and install the host integrations — Claude Code, Codex, Antigravity, Grok — with one click, or drive the same installer from the command line:
 
 ```bash
 node src/install/cli.mjs claude   # Claude Code plugin: marketplace + permissions + HUD segment
@@ -196,7 +196,7 @@ node src/install/cli.mjs uninstall-claude
 
 One-click installation (choose one):
 
-- **DSH settings page** (when hub mode is installed): Settings → DSH Crew → "Install to Claude Code"
+- **DSH settings page** (when hub mode is installed): Settings → DSH Adapter → "Install to Claude Code"
 - **Command line**: `node src/install/cli.mjs all`
 
 Both do the same thing: register local marketplace (the repo itself, via `.claude-plugin/marketplace.json`) + `claude plugin install` + MCP tool permission allowlist + claude-hud worker status segment config (auto-backup settings.json before changes, idempotent). **Restart the session after installation for changes to take effect.**
@@ -208,7 +208,7 @@ Both do the same thing: register local marketplace (the repo itself, via `.claud
 - **HUD status line segment**: `⚙dsh 1▶pro 2m14s 21.7k/606 ✓3` (current tier / elapsed time / token usage / completion count)
   - For local development, `statusline/statusline.sh` or `statusline/worker-segment.sh` can be independently integrated
 - **Long-running tasks**: CC has timeout limits on MCP calls (`MCP_TOOL_TIMEOUT` adjustable), long tasks can have orchestrator use `dsh_spawn_worker` + `dsh_worker_result(wait_seconds)` polling
-- **Local development and debugging**: `claude --plugin-dir /path/to/dsh-crew` to temporarily load
+- **Local development and debugging**: `claude --plugin-dir /path/to/dsh-adapter` to temporarily load
 
 
 ### Session commands
@@ -217,11 +217,11 @@ These override the global defaults for the current session only, and are enforce
 
 | Command | What it does |
 |---|---|
-| `/dsh-crew:config` | Show or set this session's defaults: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<seconds>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
+| `/dsh-adapter:config` | Show or set this session's defaults: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<seconds>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
 
-| `/dsh-crew:on` · `/dsh-crew:off` | Turn dispatch for this session on or off (off is a hard switch: the tool refuses) |
-| `/dsh-crew:status` | Live status of worker jobs: tier, progress, tokens, current tool |
-| `/dsh-crew:playbook` | Dispatch best practices: choosing flash vs pro, self-contained briefs, parallelism, verifying results, guardrails |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | Turn dispatch for this session on or off (off is a hard switch: the tool refuses) |
+| `/dsh-adapter:status` | Live status of worker jobs: tier, progress, tokens, current tool |
+| `/dsh-adapter:playbook` | Dispatch best practices: choosing flash vs pro, self-contained briefs, parallelism, verifying results, guardrails |
 
 ## Codex
 
@@ -272,7 +272,7 @@ Three prompts are installed for Codex:
 node src/install/cli.mjs agy
 ```
 
-Registers the dsh-crew MCP server in `~/.gemini/config/mcp_config.json` and installs the `ds-flash` / `ds-pro` agents plus the `dsh-config`, `dsh-status` and `dsh-playbook` skills into `~/.gemini/config/` (all files backed up first). Restart the session after installation.
+Registers the dsh-adapter MCP server in `~/.gemini/config/mcp_config.json` and installs the `ds-flash` / `ds-pro` agents plus the `dsh-config`, `dsh-status` and `dsh-playbook` skills into `~/.gemini/config/` (all files backed up first). Restart the session after installation.
 
 ### Usage
 
@@ -301,7 +301,7 @@ Uninstall: `node src/install/cli.mjs uninstall-agy`
 node src/install/cli.mjs grok
 ```
 
-Writes the `[mcp_servers.dsh-crew]` section into `~/.grok/config.toml` and installs the `ds-flash` / `ds-pro` agents plus the `/dsh-config`, `/dsh-status` and `/dsh-playbook` commands into `~/.grok/` (all files backed up first).
+Writes the `[mcp_servers.dsh-adapter]` section into `~/.grok/config.toml` and installs the `ds-flash` / `ds-pro` agents plus the `/dsh-config`, `/dsh-status` and `/dsh-playbook` commands into `~/.grok/` (all files backed up first).
 
 ### Usage
 
@@ -333,7 +333,7 @@ Uninstall: `node src/install/cli.mjs uninstall-grok`
 | `dsh_worker_cancel` | Cancel specified job, terminate its runtime process |
 | `dsh_worker_config` | Read/set session defaults (tier, effort, mode, timeout, policy, escalation) and list `worker_profiles` |
 
-Progress is simultaneously mirrored to `~/.config/dsh-crew/status.d/` (one shard file per writer, can be read by statusline / external monitoring).
+Progress is simultaneously mirrored to `~/.config/dsh-adapter/status.d/` (one shard file per writer, can be read by statusline / external monitoring).
 
 ## Dispatch guardrails
 
@@ -344,7 +344,7 @@ Every dispatch is checked before anything spawns — refusals are readable error
 
 ## Dispatch playbook
 
-How to dispatch *well* — flash vs pro, self-contained briefs, safe parallelism, verifying results, and the guardrails above — is bundled as a per-host playbook: `/dsh-crew:playbook` (Claude Code skill), `/dsh-playbook` (Codex prompt, Antigravity skill, Grok command).
+How to dispatch *well* — flash vs pro, self-contained briefs, safe parallelism, verifying results, and the guardrails above — is bundled as a per-host playbook: `/dsh-adapter:playbook` (Claude Code skill), `/dsh-playbook` (Codex prompt, Antigravity skill, Grok command).
 
 ## Explicit CLI backends
 
@@ -354,7 +354,7 @@ How to dispatch *well* — flash vs pro, self-contained briefs, safe parallelism
 
 **DeepSeek is a text-only model** and does not support image input or generation. This plugin sources these capabilities externally through MCP tools:
 
-**Native vision first**: when the vision provider is a built-in CLI (or explicitly `native`), `describe_image` first tries DeepSeek's own VL model `deepseek-v4-flash-vision-exp` (direct API call; key from `DEEPSEEK_API_KEY` or `~/.config/dsh-crew/.env`). Any failure degrades gracefully to the CLI provider chain below, which is kept as the fallback. Image generation is untouched — the native model only ever looks at pictures.
+**Native vision first**: when the vision provider is a built-in CLI (or explicitly `native`), `describe_image` first tries DeepSeek's own VL model `deepseek-v4-flash-vision-exp` (direct API call; key from `DEEPSEEK_API_KEY` or `~/.config/dsh-adapter/.env`). Any failure degrades gracefully to the CLI provider chain below, which is kept as the fallback. Image generation is untouched — the native model only ever looks at pictures.
 
 | Tool | Description |
 |---|---|
@@ -365,7 +365,7 @@ How to dispatch *well* — flash vs pro, self-contained briefs, safe parallelism
 
 ### Configuration
 
-In **DSH settings page → DSH Crew → Multimodal** (or directly edit `~/.config/dsh-crew/config.json`):
+In **DSH settings page → DSH Adapter → Multimodal** (or directly edit `~/.config/dsh-adapter/config.json`):
 
 **Vision provider** (image viewing):
 
@@ -409,15 +409,15 @@ Two integration methods:
 
 ## Hub mode
 
-This package is also a valid DSH bundle (`dsh.bundle` + `cordis.patch.yml`). After installing into DSH Web profile with `dsh plugin add dsh-crew`:
+This package is also a valid DSH bundle (`dsh.bundle` + `cordis.patch.yml`). After installing into DSH Web profile with `dsh plugin add dsh-adapter`:
 
 - **Worker sessions become first-class citizens**: run as first-class sessions in DSH host (`agents.create` + per-session model/effort waterfall + default preset), appear in Web UI session list, can be opened anytime to view complete execution
 - **Organize by working directory**: manage worker sessions by cwd in Web UI
 - **Loopback API**:
-  - `POST/GET /_dsh/dsh-crew/jobs`: spawn tasks, list, long-poll results, cancel
-  - `GET /_dsh/dsh-crew/ping`: health check (MCP shim uses this to detect if hub is running)
-  - `POST /_dsh/dsh-crew/install`: one-click install of the host integrations — Claude Code / Codex / Antigravity / Grok (backend of `src/install/`)
-- **Auto-detection**: the hosts' MCP shim auto-detects hub (`DSHPLUGIN_CREW_HUB` env var, default `http://127.0.0.1:3080`)
+  - `POST/GET /_dsh/dsh-adapter/jobs`: spawn tasks, list, long-poll results, cancel
+  - `GET /_dsh/dsh-adapter/ping`: health check (MCP shim uses this to detect if hub is running)
+  - `POST /_dsh/dsh-adapter/install`: one-click install of the host integrations — Claude Code / Codex / Antigravity / Grok (backend of `src/install/`)
+- **Auto-detection**: the hosts' MCP shim auto-detects hub (`DSHPLUGIN_ADAPTER_HUB` env var, default `http://127.0.0.1:3080`)
   - DSH Web running → jobs enter hub mode (`mode: "hub"`)
   - Not running → fall back to standalone runtime
 
@@ -441,7 +441,7 @@ This package is also a valid DSH bundle (`dsh.bundle` + `cordis.patch.yml`). Aft
 
 ### Running DSH Web → hub mode auto-enabled
 
-- **Current state**: If `dsh plugin add dsh-crew` installed into DSH Web profile, jobs run as first-class sessions in host, appear in Web UI session list
+- **Current state**: If `dsh plugin add dsh-adapter` installed into DSH Web profile, jobs run as first-class sessions in host, appear in Web UI session list
 - **Recommendation**: During local development iteration, recommend enabling hub mode; worker progress can be fully observed in Web UI; for cross-machine collaboration or environments without Web UI, use the dispatching-host shell approach
 
 ### Known items

@@ -15,7 +15,7 @@
 //     then share one lock), resolve() otherwise.
 //   - Process memory only, on purpose: no file locks, so a crashed dispatch
 //     process can never leave a permanent deadlock behind — its locks die
-//     with it. Locks therefore coordinate dispatches within one crew MCP
+//     with it. Locks therefore coordinate dispatches within one adapter MCP
 //     session (one per host session).
 //   - Advisory: allow_concurrent_cwd: true skips acquisition entirely
 //     (read-only fan-out over one repo is legitimate).

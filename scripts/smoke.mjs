@@ -6,7 +6,7 @@ import { hubAvailable, hub } from '../src/hub-client.mjs';
 import { readGlobalConfig } from '../src/install/install.mjs';
 
 try {
-  const hubUrl = process.env.DSHPLUGIN_CREW_HUB ?? process.env.DSH_CREW_HUB ?? readGlobalConfig().hub_url;
+  const hubUrl = process.env.DSHPLUGIN_ADAPTER_HUB ?? process.env.DSH_ADAPTER_HUB ?? readGlobalConfig().hub_url;
   const isHubUp = await hubAvailable();
 
   if (isHubUp) {
@@ -54,7 +54,7 @@ try {
         console.log('smoke test passed — configuration OK');
       } else {
         console.error(`smoke test failed: status=${v.status} error=${v.error}`);
-        console.error('Hint: DEEPSEEK_API_KEY missing or invalid in env or ~/.config/dsh-crew/.env, or runtime not installed');
+        console.error('Hint: DEEPSEEK_API_KEY missing or invalid in env or ~/.config/dsh-adapter/.env, or runtime not installed');
         process.exit(1);
       }
     } catch (err) {
@@ -68,7 +68,7 @@ try {
         console.error('Hint: run "pnpm install" from a source checkout, or start a DSH instance to use hub mode');
       } else {
         console.error(`smoke test failed: ${err.message}`);
-        console.error('Hint: DEEPSEEK_API_KEY missing or invalid in env or ~/.config/dsh-crew/.env');
+        console.error('Hint: DEEPSEEK_API_KEY missing or invalid in env or ~/.config/dsh-adapter/.env');
       }
       process.exit(1);
     }

@@ -4,9 +4,9 @@ description: How to dispatch well — choosing flash vs pro, writing self-contai
 
 When the user asks how to dispatch work to DSH workers — tier choice, writing a brief, parallelism, verifying results, guardrails — answer from the playbook below. Point to the relevant section rather than reciting it whole.
 
-In this host the dsh-crew MCP tools are namespaced: wherever the playbook says `dsh_run_worker`, call `dsh-crew__dsh_run_worker`, and likewise for the other five tools.
+In this host the dsh-adapter MCP tools are namespaced: wherever the playbook says `dsh_run_worker`, call `dsh-adapter__dsh_run_worker`, and likewise for the other five tools.
 
-# DSH Crew — Dispatch Playbook
+# DSH Adapter — Dispatch Playbook
 
 How to delegate work to DSH workers well. The tool descriptions carry the mechanics; this playbook is the decision layer.
 

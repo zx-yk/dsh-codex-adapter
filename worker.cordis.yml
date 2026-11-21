@@ -1,4 +1,4 @@
-# dsh-crew: unattended coding-worker composition for dsh-jsonrpc-agent.
+# dsh-adapter: unattended coding-worker composition for dsh-jsonrpc-agent.
 # stdout is reserved for JSON-RPC frames; never add a console logger here.
 # Model/provider arrive per process via the SDK initialize handshake.
 

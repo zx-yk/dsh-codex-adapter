@@ -1,12 +1,12 @@
 {
-  "name": "dsh-crew",
+  "name": "dsh-adapter",
   "owner": {
     "name": "ZSeven-W"
   },
   "description": "Dispatch subtasks to DeepSeek Harness (DSH) agents as native subagents with live progress",
   "plugins": [
     {
-      "name": "dsh-crew",
+      "name": "dsh-adapter",
       "source": "./",
       "description": "Dispatch subtasks to DeepSeek Harness (DSH) agents as native subagents with live progress",
       "category": "productivity"

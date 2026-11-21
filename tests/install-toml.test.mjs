@@ -29,13 +29,13 @@ const hasTomllib = spawnSync('python3', ['-c', 'import tomllib'], { encoding: 'u
 let home;
 let install;
 before(async () => {
-  home = mkdtempSync(join(tmpdir(), 'dsh-crew-toml-'));
+  home = mkdtempSync(join(tmpdir(), 'dsh-adapter-toml-'));
   process.env.HOME = home;
   install = await import('../src/install/install.mjs');
 });
 
 test('a Windows path survives the round trip', { skip: !hasTomllib && 'python3 tomllib unavailable' }, () => {
-  const path = 'C:\\Users\\kk\\.dsh\\profiles\\web\\node_modules\\@zseven-w\\dsh-crew\\lib\\server.mjs';
+  const path = 'C:\\Users\\kk\\.dsh\\profiles\\web\\node_modules\\@zseven-w\\dsh-adapter\\lib\\server.mjs';
 
   // The shape that shipped: rejected by the parser.
   assert.equal(parseToml(`args = ["${path}"]\n`).ok, false);
@@ -58,7 +58,7 @@ test('installGrok writes a config.toml that parses', { skip: !hasTomllib && 'pyt
   assert.ok(result.ok);
   const parsed = parseToml(readFileSync(join(home, '.grok', 'config.toml'), 'utf8'));
   assert.ok(parsed.ok, parsed.error);
-  const server = parsed.value.mcp_servers['dsh-crew'];
+  const server = parsed.value.mcp_servers['dsh-adapter'];
   assert.equal(server.command, 'node');
   assert.match(server.args[0], /server\.mjs$/);
 });
@@ -68,7 +68,7 @@ test('installCodex writes agent roles that parse', { skip: !hasTomllib && 'pytho
   for (const f of ['ds-flash.toml', 'ds-pro.toml']) {
     const parsed = parseToml(readFileSync(join(home, '.codex', 'agents', f), 'utf8'));
     assert.ok(parsed.ok, `${f}: ${parsed.error}`);
-    assert.match(parsed.value.mcp_servers['dsh-crew'].args[0], /server\.mjs$/);
+    assert.match(parsed.value.mcp_servers['dsh-adapter'].args[0], /server\.mjs$/);
   }
 });
 

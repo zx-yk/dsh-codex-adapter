@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
   <strong>Bir <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> eklentisi: Claude Code / Codex / Antigravity / Grok'tan DSH ajanlarına iş gönderin; host'un yerel subagent arayüzünden vazgeçmeden.</strong><br />
@@ -24,13 +24,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew — ayarlar sayfası" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — ayarlar sayfası" width="100%" />
 </p>
-<p align="center"><sub>DSH Crew ayarlar sayfası — host entegrasyonları, gönderim politikası, yürütme ve multimodal köprü</sub></p>
+<p align="center"><sub>DSH Adapter ayarlar sayfası — host entegrasyonları, gönderim politikası, yürütme ve multimodal köprü</sub></p>
 
-## Neden DSH Crew
+## Neden DSH Adapter
 
-DSH Crew, [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) için bir eklentidir — açık kaynaklı bir agent harness. DSH ajanlarını Claude Code, Codex, Antigravity ve Grok'tan gönderilebilir hale getirir: orchestrator kendi modelini korur, iş gerçek bir DSH ajanında bu harness'ın araçları, sandbox'ı, preset'leri ve oturum geçmişiyle çalışır; host ise onu canlı ilerlemeyle yerel bir subagent olarak göstermeye devam eder.
+DSH Adapter, [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) için bir eklentidir — açık kaynaklı bir agent harness. DSH ajanlarını Claude Code, Codex, Antigravity ve Grok'tan gönderilebilir hale getirir: orchestrator kendi modelini korur, iş gerçek bir DSH ajanında bu harness'ın araçları, sandbox'ı, preset'leri ve oturum geçmişiyle çalışır; host ise onu canlı ilerlemeyle yerel bir subagent olarak göstermeye devam eder.
 
 İşi çalıştıran şey bir DSH ajanıdır, çıplak bir model çağrısı değil. Tier'lar (`flash` / `pro`), ajanın harness'ın yapılandırılmış roster'ından ne kadar yetenek alacağını seçer — bugün DeepSeek V4 Flash ve V4 Pro — yani DSH'de model değişikliği burada hiçbir değişiklik gerektirmez.
 
@@ -79,7 +79,7 @@ Her gönderim, herhangi bir şey başlamadan önce kontrol edilir. worker→work
 
 ### 📋 İş Panosu
 
-DSH Crew paneli aynı zamanda bir iş panosudur: her worker işi — çalışan veya biten — tier, effort, canlı ilerleme ve token'larıyla listelenir, tutulan workspace'ler sahiplerini gösterir ve yol ortasında kaybolan bir iş (ör. hub yeniden başlatma) sessizce kaybolmak yerine yetim bir ghost olarak görünür.
+DSH Adapter paneli aynı zamanda bir iş panosudur: her worker işi — çalışan veya biten — tier, effort, canlı ilerleme ve token'larıyla listelenir, tutulan workspace'ler sahiplerini gösterir ve yol ortasında kaybolan bir iş (ör. hub yeniden başlatma) sessizce kaybolmak yerine yetim bir ghost olarak görünür.
 
 </td>
 </tr>
@@ -118,14 +118,14 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Dağıtım yatayda büyür. Aşağıda on sekiz worker bu README'yi paralel olarak çeviriyor: host onları kendi subagent'ları olarak sayarken, harness onları gerçek oturumlar olarak çalıştırır.
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>Claude Code'da dsh-crew worker'ları yerel subagent olarak görünür; statusline bölümü çalışan tier'ları, geçen süreyi ve token'ları gösterir.</sub></p>
+<p align="center"><sub>Claude Code'da dsh-adapter worker'ları yerel subagent olarak görünür; statusline bölümü çalışan tier'ları, geçen süreyi ve token'ları gösterir.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>DSH Crew paneli aynı çalışmayı harness tarafından gösterir: her işi hangi host gönderdi, tier ve effort değerleri, canlı ilerleme ve token kullanımı.</sub></p>
+<p align="center"><sub>DSH Adapter paneli aynı çalışmayı harness tarafından gösterir: her işi hangi host gönderdi, tier ve effort değerleri, canlı ilerleme ve token kullanımı.</sub></p>
 
 <p align="center"><sub>Panel aynı zamanda iş panosudur: çalışan ve biten işler tier, ilerleme ve token'larıyla listelenmeye devam eder, tutulan workspace'ler sahiplerinin adını söyler ve yol ortasında kaybolan bir iş (hub yeniden başlatma) sessizce kaybolmak yerine yetim bir ghost olarak görünür.</sub></p>
 
@@ -141,7 +141,7 @@ dsh web
 Ya da kaynak ağacından yerel geliştirme için:
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -151,7 +151,7 @@ dsh web
 
 Hub modunda — yukarıdaki kurulum — worker'lar DSH örneğinin içinde çalışır ve zaten yapılandırılmış olan DeepSeek kimlik bilgilerini kullanır. Başka bir şey ayarlamaya gerek yok.
 
-Yalnızca standalone geri dönüş yolu kendi anahtarına ihtiyaç duyar: DSH örneği çalışmıyorken bir host'tan iş gönderdiğinizde worker runtime ayrı bir işlem olarak başlatılır. [platform.deepseek.com](https://platform.deepseek.com) adresinden bir API key alın ve `~/.config/dsh-crew/.env` dosyasına yazın:
+Yalnızca standalone geri dönüş yolu kendi anahtarına ihtiyaç duyar: DSH örneği çalışmıyorken bir host'tan iş gönderdiğinizde worker runtime ayrı bir işlem olarak başlatılır. [platform.deepseek.com](https://platform.deepseek.com) adresinden bir API key alın ve `~/.config/dsh-adapter/.env` dosyasına yazın:
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -165,7 +165,7 @@ node scripts/smoke.mjs
 
 Smoke test, mevcut yol üzerinden ucuz bir iş gönderir — bir DSH örneği çalışıyorsa hub, aksi halde standalone — ve hangisini kullandığını yazdırır. Yaklaşık on saniye içinde `smoke test passed — configuration OK` görmelisiniz. Hata durumunda nedeni yazdırılır; bu neden test edilen yola özgüdür.
 
-Ardından Ayarlar → DSH Crew bölümünden host entegrasyonlarını — Claude Code, Codex, Antigravity, Grok — tek tıkla kurun ya da aynı yükleyiciyi komut satırından sürün:
+Ardından Ayarlar → DSH Adapter bölümünden host entegrasyonlarını — Claude Code, Codex, Antigravity, Grok — tek tıkla kurun ya da aynı yükleyiciyi komut satırından sürün:
 
 ```bash
 node src/install/cli.mjs claude   # Claude Code plugin: marketplace + permissions + HUD segment
@@ -192,7 +192,7 @@ node src/install/cli.mjs uninstall-claude
 
 Tek tıkla kurulum (birini seçin):
 
-- **DSH ayarlar sayfası** (hub modu kuruluysa): Ayarlar → DSH Crew → "Install to Claude Code"
+- **DSH ayarlar sayfası** (hub modu kuruluysa): Ayarlar → DSH Adapter → "Install to Claude Code"
 - **Komut satırı**: `node src/install/cli.mjs all`
 
 Her ikisi de aynı şeyi yapar: yerel marketplace'i kaydeder (üst dizin `dsh-plugins/` marketplace kökü olarak) + `claude plugin install` + MCP araç izin allowlist'i + claude-hud worker durum bölümü yapılandırması (değişikliklerden önce settings.json otomatik yedeklenir, idempotent). **Değişikliklerin etkili olması için kurulumdan sonra oturumu yeniden başlatın.**
@@ -204,7 +204,7 @@ Her ikisi de aynı şeyi yapar: yerel marketplace'i kaydeder (üst dizin `dsh-pl
 - **HUD durum satırı bölümü**: `⚙dsh 1▶pro 2m14s 21.7k/606 ✓3` (geçerli tier / geçen süre / token kullanımı / tamamlama sayısı)
   - Yerel geliştirme için `statusline/statusline.sh` veya `statusline/worker-segment.sh` bağımsız olarak entegre edilebilir
 - **Uzun süren görevler**: CC'nin MCP çağrılarında zaman aşımı limitleri vardır (`MCP_TOOL_TIMEOUT` ayarlanabilir); uzun görevlerde orchestrator, `dsh_spawn_worker` + `dsh_worker_result(wait_seconds)` yoklama kullanabilir
-- **Yerel geliştirme ve hata ayıklama**: geçici olarak yüklemek için `claude --plugin-dir /path/to/dsh-crew`
+- **Yerel geliştirme ve hata ayıklama**: geçici olarak yüklemek için `claude --plugin-dir /path/to/dsh-adapter`
 
 
 ### Oturum komutları
@@ -213,11 +213,11 @@ Genel varsayılanları yalnızca geçerli oturum için geçersiz kılar ve promp
 
 | Komut | Ne yapar |
 |---|---|
-| `/dsh-crew:config` | Oturumun varsayılanlarını göster ya da ayarla: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<saniye>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
+| `/dsh-adapter:config` | Oturumun varsayılanlarını göster ya da ayarla: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<saniye>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
 
-| `/dsh-crew:on` · `/dsh-crew:off` | Bu oturumda dağıtımı aç ya da kapat (kapalı sert bir anahtardır: araç reddeder) |
-| `/dsh-crew:status` | Worker işlerinin canlı durumu: tier, ilerleme, token, geçerli araç |
-| `/dsh-crew:playbook` | Gönderim en iyi uygulamaları: flash ve pro seçimi, kendi kendine yeten brifingler, paralellik, sonuçları doğrulama, koruma korkulukları |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | Bu oturumda dağıtımı aç ya da kapat (kapalı sert bir anahtardır: araç reddeder) |
+| `/dsh-adapter:status` | Worker işlerinin canlı durumu: tier, ilerleme, token, geçerli araç |
+| `/dsh-adapter:playbook` | Gönderim en iyi uygulamaları: flash ve pro seçimi, kendi kendine yeten brifingler, paralellik, sonuçları doğrulama, koruma korkulukları |
 
 ## Codex
 
@@ -268,7 +268,7 @@ Codex için üç prompt kurulur:
 node src/install/cli.mjs agy
 ```
 
-dsh-crew MCP sunucusunu `~/.gemini/config/mcp_config.json` dosyasına kaydeder ve `ds-flash` / `ds-pro` agent'larını, `dsh-config`, `dsh-status` ve `dsh-playbook` skill'lerini `~/.gemini/config/` dizinine kurar (tüm dosyalar önce yedeklenir). Kurulumdan sonra oturumu yeniden başlatın.
+dsh-adapter MCP sunucusunu `~/.gemini/config/mcp_config.json` dosyasına kaydeder ve `ds-flash` / `ds-pro` agent'larını, `dsh-config`, `dsh-status` ve `dsh-playbook` skill'lerini `~/.gemini/config/` dizinine kurar (tüm dosyalar önce yedeklenir). Kurulumdan sonra oturumu yeniden başlatın.
 
 ### Kullanım
 
@@ -297,7 +297,7 @@ Kaldırma: `node src/install/cli.mjs uninstall-agy`
 node src/install/cli.mjs grok
 ```
 
-`[mcp_servers.dsh-crew]` bölümünü `~/.grok/config.toml` dosyasına yazar ve `ds-flash` / `ds-pro` agent'larını, `/dsh-config`, `/dsh-status` ve `/dsh-playbook` komutlarını `~/.grok/` dizinine kurar (tüm dosyalar önce yedeklenir).
+`[mcp_servers.dsh-adapter]` bölümünü `~/.grok/config.toml` dosyasına yazar ve `ds-flash` / `ds-pro` agent'larını, `/dsh-config`, `/dsh-status` ve `/dsh-playbook` komutlarını `~/.grok/` dizinine kurar (tüm dosyalar önce yedeklenir).
 
 ### Kullanım
 
@@ -329,7 +329,7 @@ Kaldırma: `node src/install/cli.mjs uninstall-grok`
 | `dsh_worker_cancel` | Belirtilen işi iptal eder, runtime sürecini sonlandırır |
 | `dsh_worker_config` | Oturum varsayılanlarını oku/ayarla (tier, effort, mode, timeout, policy, escalation) ve `worker_profiles` listele |
 
-İlerleme aynı anda `~/.config/dsh-crew/status.d/` dizinine yansıtılır (yazar başına bir shard dosyası; statusline / harici izleme tarafından okunabilir).
+İlerleme aynı anda `~/.config/dsh-adapter/status.d/` dizinine yansıtılır (yazar başına bir shard dosyası; statusline / harici izleme tarafından okunabilir).
 
 ## Gönderim korkulukları
 
@@ -340,7 +340,7 @@ Her gönderim, herhangi bir şey başlamadan önce kontrol edilir — reddetmele
 
 ## Gönderim playbook'u
 
-*İyi* gönderim nasıl yapılır — flash ve pro, kendi kendine yeten brifingler, güvenli paralellik, sonuçları doğrulama ve yukarıdaki koruma korkulukları — host başına bir playbook olarak paketlenmiştir: `/dsh-crew:playbook` (Claude Code skill), `/dsh-playbook` (Codex prompt, Antigravity skill, Grok komutu).
+*İyi* gönderim nasıl yapılır — flash ve pro, kendi kendine yeten brifingler, güvenli paralellik, sonuçları doğrulama ve yukarıdaki koruma korkulukları — host başına bir playbook olarak paketlenmiştir: `/dsh-adapter:playbook` (Claude Code skill), `/dsh-playbook` (Codex prompt, Antigravity skill, Grok komutu).
 
 ## Açık CLI arka uçları
 
@@ -350,7 +350,7 @@ Her gönderim, herhangi bir şey başlamadan önce kontrol edilir — reddetmele
 
 **DeepSeek yalnızca metin modelidir** ve görsel girdisini veya üretimini desteklemez. Bu eklenti bu yetenekleri MCP araçları aracılığıyla harici olarak sağlar:
 
-**Önce yerel görüntü inceleme**: Görüntü sağlayıcısı yerleşik bir CLI olduğunda (veya açıkça `native`), `describe_image` önce DeepSeek'in kendi VL modelini `deepseek-v4-flash-vision-exp` dener (doğrudan API çağrısı; key `DEEPSEEK_API_KEY` veya `~/.config/dsh-crew/.env` dosyasından). Herhangi bir hata, fallback olarak korunan aşağıdaki CLI sağlayıcı zincirine sorunsuzca düşer. Görsel üretimi etkilenmez — yerel model yalnızca görsellere bakar.
+**Önce yerel görüntü inceleme**: Görüntü sağlayıcısı yerleşik bir CLI olduğunda (veya açıkça `native`), `describe_image` önce DeepSeek'in kendi VL modelini `deepseek-v4-flash-vision-exp` dener (doğrudan API çağrısı; key `DEEPSEEK_API_KEY` veya `~/.config/dsh-adapter/.env` dosyasından). Herhangi bir hata, fallback olarak korunan aşağıdaki CLI sağlayıcı zincirine sorunsuzca düşer. Görsel üretimi etkilenmez — yerel model yalnızca görsellere bakar.
 
 | Araç | Açıklama |
 |---|---|
@@ -361,7 +361,7 @@ Her gönderim, herhangi bir şey başlamadan önce kontrol edilir — reddetmele
 
 ### Yapılandırma
 
-**DSH ayarlar sayfası → DSH Crew → Multimodal** bölümünde (veya doğrudan `~/.config/dsh-crew/config.json` dosyasını düzenleyin):
+**DSH ayarlar sayfası → DSH Adapter → Multimodal** bölümünde (veya doğrudan `~/.config/dsh-adapter/config.json` dosyasını düzenleyin):
 
 **Görüntü sağlayıcısı** (görüntü inceleme):
 
@@ -405,15 +405,15 @@ Her gönderim, herhangi bir şey başlamadan önce kontrol edilir — reddetmele
 
 ## Hub modu
 
-Bu paket aynı zamanda geçerli bir DSH bundle'ıdır (`dsh.bundle` + `cordis.patch.yml`). `dsh plugin add dsh-crew` ile DSH Web profiline kurulduktan sonra:
+Bu paket aynı zamanda geçerli bir DSH bundle'ıdır (`dsh.bundle` + `cordis.patch.yml`). `dsh plugin add dsh-adapter` ile DSH Web profiline kurulduktan sonra:
 
 - **Worker oturumları birinci sınıf vatandaş olur**: DSH host'unda birinci sınıf oturumlar olarak çalışır (`agents.create` + oturum başına model/effort şelalesi + varsayılan preset), Web UI oturum listesinde görünür ve tam yürütmeyi görmek için istenildiği zaman açılabilir
 - **Çalışma dizinine göre düzenleme**: Web UI'da worker oturumlarını cwd'ye göre yönetin
 - **Loopback API**:
-  - `POST/GET /_dsh/dsh-crew/jobs`: görev başlatma, listeleme, sonuçları long-poll ile bekleme, iptal
-  - `GET /_dsh/dsh-crew/ping`: sağlık kontrolü (MCP shim, hub'ın çalışıp çalışmadığını anlamak için bunu kullanır)
-  - `POST /_dsh/dsh-crew/install`: host entegrasyonlarının tek tıkla kurulumu — Claude Code / Codex / Antigravity / Grok (`src/install/` arka ucu)
-- **Otomatik algılama**: Host'ların MCP shim'i hub'ı otomatik algılar (`DSHPLUGIN_CREW_HUB` ortam değişkeni, varsayılan `http://127.0.0.1:3080`)
+  - `POST/GET /_dsh/dsh-adapter/jobs`: görev başlatma, listeleme, sonuçları long-poll ile bekleme, iptal
+  - `GET /_dsh/dsh-adapter/ping`: sağlık kontrolü (MCP shim, hub'ın çalışıp çalışmadığını anlamak için bunu kullanır)
+  - `POST /_dsh/dsh-adapter/install`: host entegrasyonlarının tek tıkla kurulumu — Claude Code / Codex / Antigravity / Grok (`src/install/` arka ucu)
+- **Otomatik algılama**: Host'ların MCP shim'i hub'ı otomatik algılar (`DSHPLUGIN_ADAPTER_HUB` ortam değişkeni, varsayılan `http://127.0.0.1:3080`)
   - DSH Web çalışıyorsa → işler hub moduna girer (`mode: "hub"`)
   - Çalışmıyorsa → standalone runtime'a geri döner
 
@@ -437,7 +437,7 @@ Bu paket aynı zamanda geçerli bir DSH bundle'ıdır (`dsh.bundle` + `cordis.pa
 
 ### DSH Web çalışıyorsa → hub modu otomatik etkinleşir
 
-- **Güncel durum**: `dsh plugin add dsh-crew` DSH Web profiline kurulduysa, işler host'ta birinci sınıf oturumlar olarak çalışır ve Web UI oturum listesinde görünür
+- **Güncel durum**: `dsh plugin add dsh-adapter` DSH Web profiline kurulduysa, işler host'ta birinci sınıf oturumlar olarak çalışır ve Web UI oturum listesinde görünür
 - **Öneri**: Yerel geliştirme iterasyonu sırasında hub modunun etkinleştirilmesi önerilir; worker ilerlemesi Web UI'da tamamen izlenebilir; makineler arası iş birliği veya Web UI olmayan ortamlar için gönderim yapan host'un shell yaklaşımını kullanın
 
 ### Bilinen konular

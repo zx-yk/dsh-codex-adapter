@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
   <strong>Plugin <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: dispatch pekerjaan ke agen DSH dari Claude Code / Codex / Antigravity / Grok, tanpa kehilangan UI subagent bawaan host.</strong><br />
@@ -24,13 +24,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew — settings page" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
-<p align="center"><sub>Halaman pengaturan DSH Crew — integrasi host, kebijakan dispatch, eksekusi, dan jembatan multimodal</sub></p>
+<p align="center"><sub>Halaman pengaturan DSH Adapter — integrasi host, kebijakan dispatch, eksekusi, dan jembatan multimodal</sub></p>
 
-## Mengapa DSH Crew
+## Mengapa DSH Adapter
 
-DSH Crew adalah plugin untuk [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) — harness agen sumber terbuka. Plugin ini membuat agen DSH dapat di-dispatch dari Claude Code, Codex, Antigravity dan Grok: orchestrator tetap memakai modelnya sendiri, pekerjaan berjalan pada agen DSH sungguhan dengan tools, sandbox, preset, dan riwayat sesi milik harness tersebut, dan host tetap menampilkannya sebagai subagent bawaan dengan progres langsung.
+DSH Adapter adalah plugin untuk [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) — harness agen sumber terbuka. Plugin ini membuat agen DSH dapat di-dispatch dari Claude Code, Codex, Antigravity dan Grok: orchestrator tetap memakai modelnya sendiri, pekerjaan berjalan pada agen DSH sungguhan dengan tools, sandbox, preset, dan riwayat sesi milik harness tersebut, dan host tetap menampilkannya sebagai subagent bawaan dengan progres langsung.
 
 Yang menjalankan pekerjaan adalah agen DSH, bukan panggilan model biasa. Tier (`flash` / `pro`) menentukan seberapa besar kapabilitas yang didapat agen tersebut dari roster yang dikonfigurasi di harness — saat ini DeepSeek V4 Flash dan V4 Pro — sehingga pergantian model di DSH tidak memerlukan perubahan apa pun di sini.
 
@@ -79,7 +79,7 @@ Setiap dispatch diperiksa sebelum apa pun dijalankan. Nesting worker→worker di
 
 ### 📋 Papan Job
 
-Panel DSH Crew berfungsi ganda sebagai papan job: setiap job worker — berjalan maupun selesai — tercantum dengan tier, effort, progres langsung, dan token, workspace yang dipegang menampilkan pemegangnya, dan job yang hilang di tengah jalan (mis. restart hub) dimunculkan sebagai orphan ghost alih-alih menghilang diam-diam.
+Panel DSH Adapter berfungsi ganda sebagai papan job: setiap job worker — berjalan maupun selesai — tercantum dengan tier, effort, progres langsung, dan token, workspace yang dipegang menampilkan pemegangnya, dan job yang hilang di tengah jalan (mis. restart hub) dimunculkan sebagai orphan ghost alih-alih menghilang diam-diam.
 
 </td>
 </tr>
@@ -118,14 +118,14 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Dispatch bisa melebar. Di bawah ini delapan belas worker menerjemahkan README ini secara paralel: host menghitungnya sebagai subagent miliknya, sementara harness menjalankannya sebagai sesi nyata.
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>Di Claude Code, worker dsh-crew tampil sebagai subagent native; segmen statusline menampilkan tier yang berjalan, waktu berjalan, dan token.</sub></p>
+<p align="center"><sub>Di Claude Code, worker dsh-adapter tampil sebagai subagent native; segmen statusline menampilkan tier yang berjalan, waktu berjalan, dan token.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>Panel DSH Crew melihat eksekusi yang sama dari sisi harness: host mana yang mengirim setiap job, tier dan effort-nya, progres langsung, dan pemakaian token.</sub></p>
+<p align="center"><sub>Panel DSH Adapter melihat eksekusi yang sama dari sisi harness: host mana yang mengirim setiap job, tier dan effort-nya, progres langsung, dan pemakaian token.</sub></p>
 
 <p align="center"><sub>Panel ini juga merupakan papan job: job yang berjalan dan yang selesai tetap tercantum dengan tier, progres, dan token, workspace yang dipegang menyebut nama pemegangnya, dan job yang hilang di tengah jalan (restart hub) dimunculkan sebagai orphan ghost alih-alih menghilang diam-diam.</sub></p>
 
@@ -141,7 +141,7 @@ dsh web
 Atau, untuk pengembangan lokal langsung dari kode sumber:
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -151,7 +151,7 @@ Protokol `link:` menautkan dependensi profil ke repositori ini, sehingga hasil r
 
 Dalam hub mode — instalasi di atas — worker berjalan di dalam instance DSH dan menggunakan kredensial DeepSeek yang sudah dikonfigurasi. Tidak perlu setup apa pun.
 
-Hanya fallback standalone yang memerlukan key sendiri: ketika dispatch dari host tanpa instance DSH yang berjalan, worker runtime diluncurkan sebagai proses terpisah. Ambil API key di [platform.deepseek.com](https://platform.deepseek.com) lalu tulis ke `~/.config/dsh-crew/.env`:
+Hanya fallback standalone yang memerlukan key sendiri: ketika dispatch dari host tanpa instance DSH yang berjalan, worker runtime diluncurkan sebagai proses terpisah. Ambil API key di [platform.deepseek.com](https://platform.deepseek.com) lalu tulis ke `~/.config/dsh-adapter/.env`:
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -165,7 +165,7 @@ node scripts/smoke.mjs
 
 Smoke test mengirim satu job murah melalui path yang tersedia — hub saat instance DSH sedang berjalan, standalone sebaliknya — dan mencetak path mana yang digunakan. Dalam sekitar sepuluh detik akan muncul `smoke test passed — configuration OK`. Jika gagal, alasannya dicetak dan dibatasi pada path yang diuji.
 
-Lalu buka Pengaturan → DSH Crew dan pasang integrasi host — Claude Code, Codex, Antigravity, Grok — dengan sekali klik, atau jalankan installer yang sama dari baris perintah:
+Lalu buka Pengaturan → DSH Adapter dan pasang integrasi host — Claude Code, Codex, Antigravity, Grok — dengan sekali klik, atau jalankan installer yang sama dari baris perintah:
 
 ```bash
 node src/install/cli.mjs claude   # plugin Claude Code: marketplace + izin + segmen HUD
@@ -192,7 +192,7 @@ node src/install/cli.mjs uninstall-claude
 
 Instalasi sekali klik (pilih salah satu):
 
-- **Halaman pengaturan DSH** (saat mode hub terpasang): Settings → DSH Crew → "Install to Claude Code"
+- **Halaman pengaturan DSH** (saat mode hub terpasang): Settings → DSH Adapter → "Install to Claude Code"
 - **Baris perintah**: `node src/install/cli.mjs all`
 
 Keduanya melakukan hal yang sama: mendaftarkan marketplace lokal (direktori induk `dsh-plugins/` sebagai root marketplace) + `claude plugin install` + daftar izin tool MCP + konfigurasi segmen status worker claude-hud (mencadangkan settings.json otomatis sebelum perubahan, idempotent). **Mulai ulang sesi setelah instalasi agar perubahan diterapkan.**
@@ -204,7 +204,7 @@ Keduanya melakukan hal yang sama: mendaftarkan marketplace lokal (direktori indu
 - **Segmen status line HUD**: `⚙dsh 1▶pro 2m14s 21.7k/606 ✓3` (tier saat ini / waktu berjalan / penggunaan token / jumlah selesai)
   - Untuk pengembangan lokal, `statusline/statusline.sh` atau `statusline/worker-segment.sh` dapat diintegrasikan secara terpisah
 - **Tugas berdurasi panjang**: CC punya batas timeout pada panggilan MCP (`MCP_TOOL_TIMEOUT` dapat disesuaikan), untuk tugas panjang orchestrator dapat memakai polling `dsh_spawn_worker` + `dsh_worker_result(wait_seconds)`
-- **Pengembangan dan debugging lokal**: `claude --plugin-dir /path/to/dsh-crew` untuk memuat sementara
+- **Pengembangan dan debugging lokal**: `claude --plugin-dir /path/to/dsh-adapter` untuk memuat sementara
 
 
 ### Perintah sesi
@@ -213,11 +213,11 @@ Hanya menimpa nilai default global untuk sesi saat ini, dan ditegakkan di lapisa
 
 | Perintah | Fungsinya |
 |---|---|
-| `/dsh-crew:config` | Tampilkan atau setel default sesi: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<detik>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
+| `/dsh-adapter:config` | Tampilkan atau setel default sesi: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<detik>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
 
-| `/dsh-crew:on` · `/dsh-crew:off` | Nyalakan atau matikan dispatch untuk sesi ini (mati adalah saklar keras: tool menolak) |
-| `/dsh-crew:status` | Status langsung job worker: tier, progres, token, tool saat ini |
-| `/dsh-crew:playbook` | Praktik terbaik dispatch: memilih flash vs pro, brief yang mandiri, paralelisme, memverifikasi hasil, pagar pembatas |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | Nyalakan atau matikan dispatch untuk sesi ini (mati adalah saklar keras: tool menolak) |
+| `/dsh-adapter:status` | Status langsung job worker: tier, progres, token, tool saat ini |
+| `/dsh-adapter:playbook` | Praktik terbaik dispatch: memilih flash vs pro, brief yang mandiri, paralelisme, memverifikasi hasil, pagar pembatas |
 
 ## Codex
 
@@ -268,7 +268,7 @@ Untuk Codex dipasang tiga prompt:
 node src/install/cli.mjs agy
 ```
 
-Mendaftarkan server MCP dsh-crew di `~/.gemini/config/mcp_config.json` dan memasang agen `ds-flash` / `ds-pro` plus skill `dsh-config`, `dsh-status`, dan `dsh-playbook` ke `~/.gemini/config/` (semua file dicadangkan terlebih dahulu). Mulai ulang sesi setelah instalasi.
+Mendaftarkan server MCP dsh-adapter di `~/.gemini/config/mcp_config.json` dan memasang agen `ds-flash` / `ds-pro` plus skill `dsh-config`, `dsh-status`, dan `dsh-playbook` ke `~/.gemini/config/` (semua file dicadangkan terlebih dahulu). Mulai ulang sesi setelah instalasi.
 
 ### Penggunaan
 
@@ -297,7 +297,7 @@ Uninstall: `node src/install/cli.mjs uninstall-agy`
 node src/install/cli.mjs grok
 ```
 
-Menulis bagian `[mcp_servers.dsh-crew]` ke `~/.grok/config.toml` dan memasang agen `ds-flash` / `ds-pro` plus perintah `/dsh-config`, `/dsh-status`, dan `/dsh-playbook` ke `~/.grok/` (semua file dicadangkan terlebih dahulu).
+Menulis bagian `[mcp_servers.dsh-adapter]` ke `~/.grok/config.toml` dan memasang agen `ds-flash` / `ds-pro` plus perintah `/dsh-config`, `/dsh-status`, dan `/dsh-playbook` ke `~/.grok/` (semua file dicadangkan terlebih dahulu).
 
 ### Penggunaan
 
@@ -329,7 +329,7 @@ Uninstall: `node src/install/cli.mjs uninstall-grok`
 | `dsh_worker_cancel` | Batalkan job tertentu, hentikan proses runtime-nya |
 | `dsh_worker_config` | Baca/setel default sesi (tier, effort, mode, timeout, policy, escalation) dan daftarkan `worker_profiles` |
 
-Progres secara bersamaan dicerminkan ke `~/.config/dsh-crew/status.d/` (satu file shard per penulis, dapat dibaca oleh statusline / pemantauan eksternal).
+Progres secara bersamaan dicerminkan ke `~/.config/dsh-adapter/status.d/` (satu file shard per penulis, dapat dibaca oleh statusline / pemantauan eksternal).
 
 ## Pagar Pembatas Dispatch
 
@@ -340,7 +340,7 @@ Setiap dispatch diperiksa sebelum apa pun dijalankan — penolakan adalah error 
 
 ## Panduan Dispatch
 
-Cara men-dispatch dengan *baik* — flash vs pro, brief yang mandiri, paralelisme yang aman, memverifikasi hasil, dan pagar pembatas di atas — dibundel sebagai panduan per host: `/dsh-crew:playbook` (skill Claude Code), `/dsh-playbook` (prompt Codex, skill Antigravity, perintah Grok).
+Cara men-dispatch dengan *baik* — flash vs pro, brief yang mandiri, paralelisme yang aman, memverifikasi hasil, dan pagar pembatas di atas — dibundel sebagai panduan per host: `/dsh-adapter:playbook` (skill Claude Code), `/dsh-playbook` (prompt Codex, skill Antigravity, perintah Grok).
 
 ## Backend CLI Eksplisit
 
@@ -350,7 +350,7 @@ Cara men-dispatch dengan *baik* — flash vs pro, brief yang mandiri, paralelism
 
 **DeepSeek adalah model khusus teks** dan tidak mendukung input maupun pembuatan gambar. Plugin ini memperoleh kapabilitas tersebut secara eksternal melalui tool MCP:
 
-**Native vision terlebih dahulu**: ketika provider vision adalah CLI bawaan (atau secara eksplisit `native`), `describe_image` pertama-tama mencoba model VL milik DeepSeek `deepseek-v4-flash-vision-exp` (panggilan API langsung; key dari `DEEPSEEK_API_KEY` atau `~/.config/dsh-crew/.env`). Kegagalan apa pun menurun secara halus ke rantai provider CLI di bawah, yang dipertahankan sebagai fallback. Pembuatan gambar tidak tersentuh — model native hanya pernah melihat gambar.
+**Native vision terlebih dahulu**: ketika provider vision adalah CLI bawaan (atau secara eksplisit `native`), `describe_image` pertama-tama mencoba model VL milik DeepSeek `deepseek-v4-flash-vision-exp` (panggilan API langsung; key dari `DEEPSEEK_API_KEY` atau `~/.config/dsh-adapter/.env`). Kegagalan apa pun menurun secara halus ke rantai provider CLI di bawah, yang dipertahankan sebagai fallback. Pembuatan gambar tidak tersentuh — model native hanya pernah melihat gambar.
 
 | Tool | Deskripsi |
 |---|---|
@@ -361,7 +361,7 @@ Cara men-dispatch dengan *baik* — flash vs pro, brief yang mandiri, paralelism
 
 ### Konfigurasi
 
-Di **halaman pengaturan DSH → DSH Crew → Multimodal** (atau langsung edit `~/.config/dsh-crew/config.json`):
+Di **halaman pengaturan DSH → DSH Adapter → Multimodal** (atau langsung edit `~/.config/dsh-adapter/config.json`):
 
 **Provider vision** (melihat gambar):
 
@@ -405,15 +405,15 @@ Dua metode integrasi:
 
 ## Mode Hub
 
-Paket ini juga merupakan DSH bundle yang valid (`dsh.bundle` + `cordis.patch.yml`). Setelah dipasang ke profil DSH Web dengan `dsh plugin add dsh-crew`:
+Paket ini juga merupakan DSH bundle yang valid (`dsh.bundle` + `cordis.patch.yml`). Setelah dipasang ke profil DSH Web dengan `dsh plugin add dsh-adapter`:
 
 - **Sesi worker menjadi warga kelas satu**: berjalan sebagai sesi kelas satu di host DSH (`agents.create` + waterfall model/effort per sesi + preset default), muncul di daftar sesi Web UI, dapat dibuka kapan saja untuk melihat eksekusi lengkap
 - **Kelompokkan menurut direktori kerja**: kelola sesi worker berdasarkan cwd di Web UI
 - **Loopback API**:
-  - `POST/GET /_dsh/dsh-crew/jobs`: memulai tugas, daftar, long-poll hasil, membatalkan
-  - `GET /_dsh/dsh-crew/ping`: pemeriksaan kesehatan (shim MCP memakai ini untuk mendeteksi apakah hub berjalan)
-  - `POST /_dsh/dsh-crew/install`: instalasi sekali klik integrasi host — Claude Code / Codex / Antigravity / Grok (backend dari `src/install/`)
-- **Deteksi otomatis**: shim MCP para host mendeteksi hub secara otomatis (env var `DSHPLUGIN_CREW_HUB`, default `http://127.0.0.1:3080`)
+  - `POST/GET /_dsh/dsh-adapter/jobs`: memulai tugas, daftar, long-poll hasil, membatalkan
+  - `GET /_dsh/dsh-adapter/ping`: pemeriksaan kesehatan (shim MCP memakai ini untuk mendeteksi apakah hub berjalan)
+  - `POST /_dsh/dsh-adapter/install`: instalasi sekali klik integrasi host — Claude Code / Codex / Antigravity / Grok (backend dari `src/install/`)
+- **Deteksi otomatis**: shim MCP para host mendeteksi hub secara otomatis (env var `DSHPLUGIN_ADAPTER_HUB`, default `http://127.0.0.1:3080`)
   - DSH Web berjalan → job masuk mode hub (`mode: "hub"`)
   - Tidak berjalan → fallback ke runtime standalone
 
@@ -437,7 +437,7 @@ Paket ini juga merupakan DSH bundle yang valid (`dsh.bundle` + `cordis.patch.yml
 
 ### Menjalankan DSH Web → mode hub aktif otomatis
 
-- **Kondisi saat ini**: Jika `dsh plugin add dsh-crew` dipasang ke profil DSH Web, job berjalan sebagai sesi kelas satu di host, muncul di daftar sesi Web UI
+- **Kondisi saat ini**: Jika `dsh plugin add dsh-adapter` dipasang ke profil DSH Web, job berjalan sebagai sesi kelas satu di host, muncul di daftar sesi Web UI
 - **Rekomendasi**: Selama iterasi pengembangan lokal, disarankan mengaktifkan mode hub; progres worker dapat diamati sepenuhnya di Web UI; untuk kolaborasi lintas mesin atau lingkungan tanpa Web UI, gunakan pendekatan shell host yang men-dispatch
 
 ### Hal yang Diketahui

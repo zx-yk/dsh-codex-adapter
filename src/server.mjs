@@ -12,7 +12,7 @@ import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks
 import { resolveWorkerCwd } from './paths.mjs';
 import { detectOrchestrator } from './process-info.mjs';
 
-const server = new McpServer({ name: 'dsh-crew', version: '0.1.0' });
+const server = new McpServer({ name: 'dsh-adapter', version: '0.1.1' });
 
 const tierSchema = z.enum(['flash', 'pro']).optional().describe('Worker model tier. flash = mechanical, well-scoped work (single-file edits, lookups, formatting); pro = multi-file changes, debugging, design judgment. Omit to use the session default. Ignored when worker= is set.');
 const effortSchema = z.enum(['off', 'high', 'max']).optional().describe('Reasoning effort for the worker. Omit to use the session default. With worker= it only applies when passed explicitly and the profile supports it (agy maps to low/medium/high).');
@@ -21,7 +21,7 @@ const allowConcurrentCwdSchema = z.boolean().optional().describe('Allow this dis
 
 // Session-level configuration. This MCP server process lives exactly as long
 // as one Claude Code / Codex session, so plain memory IS session scope.
-// Initial values come from the global config (~/.config/dsh-crew/config.json,
+// Initial values come from the global config (~/.config/dsh-adapter/config.json,
 // edited on the DSH settings page); dsh_worker_config overrides per session.
 import { readGlobalConfig } from './install/install.mjs';
 import { describeBindings, resolveTierBinding } from './tier-binding.mjs';
@@ -73,8 +73,8 @@ const ORCHESTRATOR = detectOrchestrator();
 
 // ---------- WPC9 guardrails ----------
 
-// Origin chain this crew instance inherited from whoever spawned it (read at
-// startup from the env written by the dispatching crew — origin-guard.mjs).
+// Origin chain this adapter instance inherited from whoever spawned it (read at
+// startup from the env written by the dispatching adapter — origin-guard.mjs).
 // Every dispatch appends its own hop and refuses loops / over-deep chains
 // BEFORE anything is spawned, so recursion can never start burning quota.
 const INHERITED_ORIGIN = readInheritedOrigin(process.env);

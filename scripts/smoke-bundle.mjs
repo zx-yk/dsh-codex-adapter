@@ -55,7 +55,7 @@ if (!bundleText.includes('MAX_POLL_SLICE_SECONDS')) fail('bundle lost the MAX_PO
 console.log('[smoke:mcp] bundle assertions OK: no inlined @deepseek-ai/* code; lazy dsh-sdk-client specifier and MAX_POLL_SLICE_SECONDS present');
 
 // 2. Fresh temp dir - the 'installed plugin copy'. Nothing but the payload.
-const tmp = mkdtempSync(join(tmpdir(), 'dsh-crew-smoke-'));
+const tmp = mkdtempSync(join(tmpdir(), 'dsh-adapter-smoke-'));
 let child = null;
 let finished = false;
 
@@ -134,7 +134,7 @@ try {
   console.log('--- initialize response (raw) ---');
   console.log(responses[responses.length - 1]);
   if (!init.result || !init.result.protocolVersion) fail('initialize result missing protocolVersion');
-  if (!init.result.serverInfo || init.result.serverInfo.name !== 'dsh-crew') fail('initialize serverInfo.name is ' + JSON.stringify(init.result && init.result.serverInfo && init.result.serverInfo.name) + ', expected dsh-crew');
+  if (!init.result.serverInfo || init.result.serverInfo.name !== 'dsh-adapter') fail('initialize serverInfo.name is ' + JSON.stringify(init.result && init.result.serverInfo && init.result.serverInfo.name) + ', expected dsh-adapter');
   console.log('[smoke:mcp] initialize OK: protocolVersion=' + init.result.protocolVersion + ', serverInfo=' + JSON.stringify(init.result.serverInfo));
 
   // Per the MCP spec the client must announce readiness before other calls.

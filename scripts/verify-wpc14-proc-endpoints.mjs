@@ -1,6 +1,6 @@
 // WPC14 endpoint verification: ghost-process liveness probing and the
-// verified kill path (src/proc-kill.mjs + hub routes /_dsh/dsh-crew/proc-alive
-// and /_dsh/dsh-crew/proc-kill).
+// verified kill path (src/proc-kill.mjs + hub routes /_dsh/dsh-adapter/proc-alive
+// and /_dsh/dsh-adapter/proc-kill).
 //
 //   node scripts/verify-wpc14-proc-endpoints.mjs
 //
@@ -30,7 +30,7 @@ import {
 } from '../src/proc-kill.mjs';
 import { createShardWriter, readMergedStatus } from '../src/status-shard.mjs';
 
-const HUB = 'http://127.0.0.1:3080/_dsh/dsh-crew';
+const HUB = 'http://127.0.0.1:3080/_dsh/dsh-adapter';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const spawned = []; // every child we ever spawn, cleaned up in finally
 let failures = 0;
@@ -61,10 +61,10 @@ check('parsePid rejects garbage',
   && parsePid(99999999999) === null && parsePid('') === null);
 
 const REAL_SHAPES = {
-  dsh: 'node /Users/fini/workspace/dsh-plugins/dsh-crew/node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/bin.js /Users/fini/workspace/dsh-plugins/dsh-crew/worker.cordis.yml',
+  dsh: 'node /Users/fini/workspace/dsh-plugins/dsh-adapter/node_modules/@deepseek-ai/dsh-sdk-jsonrpc-demo/lib/bin.js /Users/fini/workspace/dsh-plugins/dsh-adapter/worker.cordis.yml',
   agy: '/Users/fini/.local/bin/agy --print do the thing --output-format stream-json --dangerously-skip-permissions --mode accept-edits --print-timeout 1800s',
   grok: '/Users/fini/.local/bin/grok -p do the thing --output-format streaming-messages-json --include-partial-messages --permission-mode bypassPermissions',
-  shim: '/bin/sh /Users/fini/workspace/dsh-plugins/dsh-crew/node_modules/.bin/dsh-jsonrpc-agent /Users/fini/workspace/dsh-plugins/dsh-crew/worker.cordis.yml',
+  shim: '/bin/sh /Users/fini/workspace/dsh-plugins/dsh-adapter/node_modules/.bin/dsh-jsonrpc-agent /Users/fini/workspace/dsh-plugins/dsh-adapter/worker.cordis.yml',
 };
 check('isWorkerCommand accepts the real dsh runtime shape (shim exec line)', isWorkerCommand(REAL_SHAPES.dsh));
 check('isWorkerCommand accepts the real agy shape', isWorkerCommand(REAL_SHAPES.agy));
@@ -245,7 +245,7 @@ console.log('== 4. hub route handlers driven through apply(ctx) with a mock webS
     logger: { info: () => {}, warn: () => {} },
   };
   const dispose = await apply(ctx);
-  const BASE = '/_dsh/dsh-crew';
+  const BASE = '/_dsh/dsh-adapter';
   const route = (name) => handlers.get(BASE + name);
   check('proc-alive + proc-kill routes registered on the mock webServer',
     typeof route('/proc-alive') === 'function' && typeof route('/proc-kill') === 'function');

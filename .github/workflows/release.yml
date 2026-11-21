@@ -77,7 +77,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dsh-crew-pack
+          name: dsh-adapter-pack
           path: dist/*.tgz
           if-no-files-found: error
 

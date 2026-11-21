@@ -1,5 +1,5 @@
 #!/bin/bash
-# dsh-crew statusline: prepends the live worker-pool segment (merged from
+# dsh-adapter statusline: prepends the live worker-pool segment (merged from
 # all status shards) to a basic statusline. For claude-hud users prefer
 # wiring worker-segment.sh via --extra-cmd instead (cli.mjs hud does this).
 

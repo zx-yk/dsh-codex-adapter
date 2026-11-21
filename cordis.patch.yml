@@ -1,4 +1,4 @@
-# dsh-crew bundle patch: mounts the workers-hub host plugin into the profile.
+# dsh-adapter bundle patch: mounts the workers-hub host plugin into the profile.
 - insert:
-    - id: dsh-crew-hub
+    - id: dsh-adapter-hub
       name: '@zoraxylia/dsh-codex-adapter'

@@ -4,7 +4,7 @@
 // OS process a job ran in. Standalone runtimes and agy/grok CLI workers are
 // independent processes: when their dispatching host dies, the process can
 // survive as a true orphan. This module backs the hub endpoints
-// (/_dsh/dsh-crew/proc-alive and /_dsh/dsh-crew/proc-kill):
+// (/_dsh/dsh-adapter/proc-alive and /_dsh/dsh-adapter/proc-kill):
 //
 //   1. Is pid alive? process.kill(pid, 0) - the same probe the status shard
 //      uses for writer liveness (status-shard.mjs writerProcessAlive).
@@ -114,13 +114,13 @@ export function isWorkerCommand(command) {
 }
 
 const NOT_A_WORKER_ZH = (pid, command) =>
-  '拒绝杀死 pid ' + pid + '：其命令行不匹配任何 dsh-crew 工作进程特征（该 pid 可能已被系统回收复用）。\n' +
+  '拒绝杀死 pid ' + pid + '：其命令行不匹配任何 dsh-adapter 工作进程特征（该 pid 可能已被系统回收复用）。\n' +
   '命令行：' + command + '\n' +
   '可杀特征：standalone DSH 运行时（…dsh-sdk-jsonrpc-demo… worker.cordis.yml）、' +
   'agy（…--output-format stream-json…）、grok（…streaming-messages-json…）。';
 
 const NOT_A_WORKER_EN = (pid, command) =>
-  'Refusing to kill pid ' + pid + ': its command line matches no process shape dsh-crew spawns (the pid may have been recycled).\n' +
+  'Refusing to kill pid ' + pid + ': its command line matches no process shape dsh-adapter spawns (the pid may have been recycled).\n' +
   'command: ' + command + '\n' +
   'Accepted shapes: standalone DSH runtime (…dsh-sdk-jsonrpc-demo… worker.cordis.yml), ' +
   'agy (…--output-format stream-json…), grok (…streaming-messages-json…).';
@@ -143,8 +143,8 @@ export async function killWorkerProcess({ pid, pgid, graceMs = PROC_KILL_GRACE_M
   if (groupKill && (parsePid(pgid) === null || pgid !== pid)) {
     throw new ProcKillRefused(
       'pgid-mismatch',
-      'pgid ' + pgid + ' 与 pid ' + pid + ' 不一致 — 拒绝整组杀死（dsh-crew 只会记录 pgid === pid 的进程组）',
-      'pgid ' + pgid + ' does not match pid ' + pid + ' — refusing the group kill (dsh-crew only ever records pgid === pid)',
+      'pgid ' + pgid + ' 与 pid ' + pid + ' 不一致 — 拒绝整组杀死（dsh-adapter 只会记录 pgid === pid 的进程组）',
+      'pgid ' + pgid + ' does not match pid ' + pid + ' — refusing the group kill (dsh-adapter only ever records pgid === pid)',
       { pid, pgid },
     );
   }

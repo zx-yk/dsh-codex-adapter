@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
   <strong><a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> plugin: Claude Code / Codex / Antigravity / Grok에서 DSH agent로 작업을 dispatch하며, 호스트의 native subagent UI는 그대로 유지합니다.</strong><br />
@@ -24,13 +24,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew — 설정 페이지" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — 설정 페이지" width="100%" />
 </p>
-<p align="center"><sub>DSH Crew 설정 페이지 — 호스트 통합, 디스패치 정책, 실행 및 멀티모달 브리지</sub></p>
+<p align="center"><sub>DSH Adapter 설정 페이지 — 호스트 통합, 디스패치 정책, 실행 및 멀티모달 브리지</sub></p>
 
-## DSH Crew를 사용하는 이유
+## DSH Adapter를 사용하는 이유
 
-DSH Crew는 오픈소스 agent harness인 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(DSH)의 plugin입니다. Claude Code, Codex, Antigravity, Grok에서 DSH agent를 dispatch할 수 있게 해 줍니다. orchestrator는 자신의 model을 유지하고, 작업은 해당 harness의 tools, sandbox, presets, session history를 갖춘 실제 DSH agent에서 실행되며, 호스트에는 live progress가 표시되는 native subagent로 계속 나타납니다.
+DSH Adapter는 오픈소스 agent harness인 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(DSH)의 plugin입니다. Claude Code, Codex, Antigravity, Grok에서 DSH agent를 dispatch할 수 있게 해 줍니다. orchestrator는 자신의 model을 유지하고, 작업은 해당 harness의 tools, sandbox, presets, session history를 갖춘 실제 DSH agent에서 실행되며, 호스트에는 live progress가 표시되는 native subagent로 계속 나타납니다.
 
 작업을 실제로 실행하는 것은 DSH agent이지, 단순한 model 호출이 아닙니다. tier(`flash` / `pro`)는 해당 agent가 harness에 설정된 model roster에서 얼마나 많은 capability를 받을지 결정합니다 — 현재는 DeepSeek V4 Flash와 V4 Pro — 따라서 DSH에서 model을 바꿔도 여기서는 변경할 필요가 없습니다.
 
@@ -79,7 +79,7 @@ DSH의 model은 text-only입니다. `describe_image`는 이제 키가 있을 때
 
 ### 📋 작업 보드
 
-DSH Crew 패널은 작업 보드 역할도 합니다: 실행 중이든 완료됐든 모든 worker job이 tier, effort, 실시간 진행 상황, 토큰과 함께 나열되고, 점유된 workspace는 보유자를 표시하며, 실행 도중 사라진 job(예: hub 재시작)은 조용히 사라지는 대신 orphan ghost로 표시됩니다.
+DSH Adapter 패널은 작업 보드 역할도 합니다: 실행 중이든 완료됐든 모든 worker job이 tier, effort, 실시간 진행 상황, 토큰과 함께 나열되고, 점유된 workspace는 보유자를 표시하며, 실행 도중 사라진 job(예: hub 재시작)은 조용히 사라지는 대신 orphan ghost로 표시됩니다.
 
 </td>
 </tr>
@@ -118,14 +118,14 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 디스패치는 넓게 펼칠 수 있습니다. 아래에서는 18개의 worker가 이 README를 병렬로 번역합니다. 호스트는 이들을 자신의 서브에이전트로 세고, harness는 실제 세션으로 실행합니다.
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>Claude Code에서 dsh-crew worker는 네이티브 서브에이전트로 보입니다. statusline 세그먼트가 실행 중인 tier, 경과 시간, 토큰을 표시합니다.</sub></p>
+<p align="center"><sub>Claude Code에서 dsh-adapter worker는 네이티브 서브에이전트로 보입니다. statusline 세그먼트가 실행 중인 tier, 경과 시간, 토큰을 표시합니다.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>DSH Crew 패널에서 본 같은 실행: 각 작업을 디스패치한 호스트, tier와 effort, 실시간 진행 상황과 토큰 사용량.</sub></p>
+<p align="center"><sub>DSH Adapter 패널에서 본 같은 실행: 각 작업을 디스패치한 호스트, tier와 effort, 실시간 진행 상황과 토큰 사용량.</sub></p>
 
 <p align="center"><sub>패널은 작업 보드이기도 합니다: 실행 중이거나 완료된 job이 tier, 진행 상황, 토큰과 함께 계속 나열되고, 점유된 workspace는 보유자를 표시하며, 실행 도중 사라진 job(hub 재시작)은 조용히 사라지는 대신 orphan ghost로 표시됩니다.</sub></p>
 
@@ -141,7 +141,7 @@ dsh web
 소스 트리에서 로컬 개발하려면:
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -151,7 +151,7 @@ dsh web
 
 hub mode에서 — 위 설치 방식에서 — worker는 DSH instance 내부에서 실행되고 이미 설정된 DSH의 DeepSeek 자격 증명을 사용합니다. 추가 설정이 필요하지 않습니다.
 
-standalone 폴백만 자체 키가 필요합니다. DSH instance가 실행 중이 아닌 호스트에서 dispatch하면 worker runtime이 별도 프로세스로 시작됩니다. [platform.deepseek.com](https://platform.deepseek.com)에서 API 키를 받아 `~/.config/dsh-crew/.env`에 씁니다:
+standalone 폴백만 자체 키가 필요합니다. DSH instance가 실행 중이 아닌 호스트에서 dispatch하면 worker runtime이 별도 프로세스로 시작됩니다. [platform.deepseek.com](https://platform.deepseek.com)에서 API 키를 받아 `~/.config/dsh-adapter/.env`에 씁니다:
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -165,7 +165,7 @@ node scripts/smoke.mjs
 
 smoke 테스트는 사용 가능한 경로를 통해 저렴한 job을 dispatch합니다 — DSH instance가 실행 중이면 hub, 그렇지 않으면 standalone — 그리고 사용한 경로를 출력합니다. 약 십 초 안에 `smoke test passed — configuration OK`가 표시되어야 합니다. 실패하면 테스트된 경로에 한정된 오류 이유가 출력됩니다.
 
-그다음 설정 → DSH Crew에서 호스트 통합(Claude Code, Codex, Antigravity, Grok)을 한 번에 설치하거나, 명령줄에서 같은 installer를 실행합니다:
+그다음 설정 → DSH Adapter에서 호스트 통합(Claude Code, Codex, Antigravity, Grok)을 한 번에 설치하거나, 명령줄에서 같은 installer를 실행합니다:
 
 ```bash
 node src/install/cli.mjs claude   # Claude Code plugin: marketplace + permissions + HUD segment
@@ -192,7 +192,7 @@ node src/install/cli.mjs uninstall-claude
 
 원클릭 설치(하나를 선택하세요):
 
-- **DSH 설정 페이지**(hub mode 설치 시): 설정 → DSH Crew → "Install to Claude Code"
+- **DSH 설정 페이지**(hub mode 설치 시): 설정 → DSH Adapter → "Install to Claude Code"
 - **명령줄**: `node src/install/cli.mjs all`
 
 둘 다 동일한 작업을 수행합니다: 로컬 marketplace 등록(상위 디렉터리 `dsh-plugins/`를 marketplace root로 사용) + `claude plugin install` + MCP tool permission allowlist + claude-hud worker status segment 설정(변경 전 settings.json 자동 백업, 멱등). **변경 사항을 적용하려면 설치 후 세션을 다시 시작하세요.**
@@ -204,7 +204,7 @@ node src/install/cli.mjs uninstall-claude
 - **HUD status line segment**: `⚙dsh 1▶pro 2m14s 21.7k/606 ✓3` (현재 tier / 경과 시간 / token 사용량 / 완료 수)
   - 로컬 개발에서는 `statusline/statusline.sh` 또는 `statusline/worker-segment.sh`를 독립적으로 통합할 수 있습니다
 - **장기 실행 작업**: CC에는 MCP 호출에 대한 timeout 제한이 있습니다(`MCP_TOOL_TIMEOUT`으로 조정 가능). 긴 작업은 orchestrator가 `dsh_spawn_worker` + `dsh_worker_result(wait_seconds)` polling을 사용할 수 있습니다
-- **로컬 개발 및 디버깅**: `claude --plugin-dir /path/to/dsh-crew`로 임시 로드할 수 있습니다
+- **로컬 개발 및 디버깅**: `claude --plugin-dir /path/to/dsh-adapter`로 임시 로드할 수 있습니다
 
 
 ### 세션 명령
@@ -213,11 +213,11 @@ node src/install/cli.mjs uninstall-claude
 
 | 명령 | 동작 |
 |---|---|
-| `/dsh-crew:config` | 이 세션의 기본값 조회·설정: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<초>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
+| `/dsh-adapter:config` | 이 세션의 기본값 조회·설정: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<초>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
 
-| `/dsh-crew:on` · `/dsh-crew:off` | 이 세션의 디스패치 켜기·끄기 (끄기는 하드 스위치로 도구가 거부) |
-| `/dsh-crew:status` | worker 작업 실시간 상태: tier, 진행, 토큰, 현재 도구 |
-| `/dsh-crew:playbook` | 디스패치 모범 사례: flash vs pro 선택, 자기 완결적인 브리프, 병렬 처리, 결과 검증, 가드레일 |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | 이 세션의 디스패치 켜기·끄기 (끄기는 하드 스위치로 도구가 거부) |
+| `/dsh-adapter:status` | worker 작업 실시간 상태: tier, 진행, 토큰, 현재 도구 |
+| `/dsh-adapter:playbook` | 디스패치 모범 사례: flash vs pro 선택, 자기 완결적인 브리프, 병렬 처리, 결과 검증, 가드레일 |
 
 ## Codex
 
@@ -268,7 +268,7 @@ Codex에는 세 개의 프롬프트가 설치됩니다:
 node src/install/cli.mjs agy
 ```
 
-dsh-crew MCP server를 `~/.gemini/config/mcp_config.json`에 등록하고 `ds-flash` / `ds-pro` agent와 `dsh-config`, `dsh-status`, `dsh-playbook` 스킬을 `~/.gemini/config/`에 설치합니다(모든 파일은 먼저 백업됨). 설치 후 세션을 다시 시작하세요.
+dsh-adapter MCP server를 `~/.gemini/config/mcp_config.json`에 등록하고 `ds-flash` / `ds-pro` agent와 `dsh-config`, `dsh-status`, `dsh-playbook` 스킬을 `~/.gemini/config/`에 설치합니다(모든 파일은 먼저 백업됨). 설치 후 세션을 다시 시작하세요.
 
 ### 사용법
 
@@ -297,7 +297,7 @@ dsh-crew MCP server를 `~/.gemini/config/mcp_config.json`에 등록하고 `ds-fl
 node src/install/cli.mjs grok
 ```
 
-`[mcp_servers.dsh-crew]` 섹션을 `~/.grok/config.toml`에 쓰고 `ds-flash` / `ds-pro` agent와 `/dsh-config`, `/dsh-status`, `/dsh-playbook` 명령을 `~/.grok/`에 설치합니다(모든 파일은 먼저 백업됨).
+`[mcp_servers.dsh-adapter]` 섹션을 `~/.grok/config.toml`에 쓰고 `ds-flash` / `ds-pro` agent와 `/dsh-config`, `/dsh-status`, `/dsh-playbook` 명령을 `~/.grok/`에 설치합니다(모든 파일은 먼저 백업됨).
 
 ### 사용법
 
@@ -329,7 +329,7 @@ node src/install/cli.mjs grok
 | `dsh_worker_cancel` | 지정한 job 취소 및 해당 runtime process 종료 |
 | `dsh_worker_config` | 세션 기본값(tier, effort, mode, timeout, policy, escalation) 조회·설정 및 `worker_profiles` 나열 |
 
-progress는 동시에 `~/.config/dsh-crew/status.d/`에 미러링됩니다(writer마다 shard file 하나, statusline / 외부 모니터링에서 읽을 수 있음).
+progress는 동시에 `~/.config/dsh-adapter/status.d/`에 미러링됩니다(writer마다 shard file 하나, statusline / 외부 모니터링에서 읽을 수 있음).
 
 ## 디스패치 가드레일
 
@@ -340,7 +340,7 @@ progress는 동시에 `~/.config/dsh-crew/status.d/`에 미러링됩니다(write
 
 ## 디스패치 플레이북
 
-dispatch를 *잘* 하는 방법 — flash vs pro 선택, 자기 완결적인 브리프, 안전한 병렬 처리, 결과 검증, 위의 가드레일 — 이 호스트별 플레이북으로 번들되어 있습니다: `/dsh-crew:playbook` (Claude Code 스킬), `/dsh-playbook` (Codex 프롬프트, Antigravity 스킬, Grok 명령).
+dispatch를 *잘* 하는 방법 — flash vs pro 선택, 자기 완결적인 브리프, 안전한 병렬 처리, 결과 검증, 위의 가드레일 — 이 호스트별 플레이북으로 번들되어 있습니다: `/dsh-adapter:playbook` (Claude Code 스킬), `/dsh-playbook` (Codex 프롬프트, Antigravity 스킬, Grok 명령).
 
 ## 명시적 CLI 백엔드
 
@@ -350,7 +350,7 @@ dispatch를 *잘* 하는 방법 — flash vs pro 선택, 자기 완결적인 브
 
 **DeepSeek는 text-only model**이며 image 입력이나 생성을 지원하지 않습니다. 이 plugin은 MCP tool을 통해 이러한 기능을 외부에서 제공받습니다:
 
-**네이티브 비전 우선**: vision provider가 내장 CLI(또는 명시적으로 `native`)일 때 `describe_image`는 먼저 DeepSeek 자체 VL model `deepseek-v4-flash-vision-exp`를 시도합니다(직접 API 호출; 키는 `DEEPSEEK_API_KEY` 또는 `~/.config/dsh-crew/.env`에서). 실패하면 아래 CLI provider 체인으로 우아하게 저하되며, 이 체인은 폴백으로 유지됩니다. 이미지 생성은 영향받지 않습니다 — 네이티브 model은 사진만 볼 뿐입니다.
+**네이티브 비전 우선**: vision provider가 내장 CLI(또는 명시적으로 `native`)일 때 `describe_image`는 먼저 DeepSeek 자체 VL model `deepseek-v4-flash-vision-exp`를 시도합니다(직접 API 호출; 키는 `DEEPSEEK_API_KEY` 또는 `~/.config/dsh-adapter/.env`에서). 실패하면 아래 CLI provider 체인으로 우아하게 저하되며, 이 체인은 폴백으로 유지됩니다. 이미지 생성은 영향받지 않습니다 — 네이티브 model은 사진만 볼 뿐입니다.
 
 | 도구 | 설명 |
 |---|---|
@@ -361,7 +361,7 @@ dispatch를 *잘* 하는 방법 — flash vs pro 선택, 자기 완결적인 브
 
 ### 구성
 
-**DSH 설정 페이지 → DSH Crew → Multimodal**(또는 `~/.config/dsh-crew/config.json` 직접 편집):
+**DSH 설정 페이지 → DSH Adapter → Multimodal**(또는 `~/.config/dsh-adapter/config.json` 직접 편집):
 
 **Vision provider**(이미지 보기):
 
@@ -405,15 +405,15 @@ dispatch를 *잘* 하는 방법 — flash vs pro 선택, 자기 완결적인 브
 
 ## Hub 모드
 
-이 패키지는 유효한 DSH bundle(`dsh.bundle` + `cordis.patch.yml`)이기도 합니다. `dsh plugin add dsh-crew`로 DSH Web profile에 설치하면:
+이 패키지는 유효한 DSH bundle(`dsh.bundle` + `cordis.patch.yml`)이기도 합니다. `dsh plugin add dsh-adapter`로 DSH Web profile에 설치하면:
 
 - **Worker session이 first-class citizen이 됩니다**: DSH host에서 first-class session으로 실행되고(`agents.create` + session별 model/effort waterfall + 기본 preset), Web UI session 목록에 표시되며, 언제든 열어 전체 실행을 확인할 수 있습니다
 - **작업 디렉터리별 구성**: Web UI에서 worker session을 cwd별로 관리할 수 있습니다
 - **Loopback API**:
-  - `POST/GET /_dsh/dsh-crew/jobs`: 작업 생성, 목록, long-poll 결과, 취소
-  - `GET /_dsh/dsh-crew/ping`: health check(MCP shim이 hub 실행 여부를 감지하는 데 사용)
-  - `POST /_dsh/dsh-crew/install`: 호스트 통합 원클릭 설치 — Claude Code / Codex / Antigravity / Grok(`src/install/`의 backend)
-- **자동 감지**: 호스트들의 MCP shim이 hub를 자동 감지합니다(`DSHPLUGIN_CREW_HUB` 환경 변수, 기본값 `http://127.0.0.1:3080`)
+  - `POST/GET /_dsh/dsh-adapter/jobs`: 작업 생성, 목록, long-poll 결과, 취소
+  - `GET /_dsh/dsh-adapter/ping`: health check(MCP shim이 hub 실행 여부를 감지하는 데 사용)
+  - `POST /_dsh/dsh-adapter/install`: 호스트 통합 원클릭 설치 — Claude Code / Codex / Antigravity / Grok(`src/install/`의 backend)
+- **자동 감지**: 호스트들의 MCP shim이 hub를 자동 감지합니다(`DSHPLUGIN_ADAPTER_HUB` 환경 변수, 기본값 `http://127.0.0.1:3080`)
   - DSH Web 실행 중 → job이 hub mode로 실행됩니다(`mode: "hub"`)
   - 실행 중이 아님 → standalone runtime으로 폴백합니다
 
@@ -437,7 +437,7 @@ dispatch를 *잘* 하는 방법 — flash vs pro 선택, 자기 완결적인 브
 
 ### DSH Web 실행 중 → hub mode 자동 활성화
 
-- **현재 상태**: `dsh plugin add dsh-crew`를 DSH Web profile에 설치했다면 job은 host에서 first-class session으로 실행되고 Web UI session 목록에 표시됩니다
+- **현재 상태**: `dsh plugin add dsh-adapter`를 DSH Web profile에 설치했다면 job은 host에서 first-class session으로 실행되고 Web UI session 목록에 표시됩니다
 - **권장**: 로컬 개발 반복 중에는 hub mode를 활성화하는 것을 권장합니다. worker progress를 Web UI에서 완전히 관찰할 수 있습니다. 머신 간 협업 또는 Web UI가 없는 환경에서는 dispatch 호스트 shell 방식을 사용하세요
 
 ### 알려진 항목

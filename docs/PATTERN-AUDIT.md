@@ -1,4 +1,4 @@
-# PATTERN-AUDIT — dsh-crew (2026-09-06)
+# PATTERN-AUDIT — dsh-adapter (2026-09-06)
 
 Audit against the six dsh-qa failure patterns (doc drift / boundary sanity / timing
 assumptions / honesty of status / evidence integrity / coverage illusion).
@@ -26,7 +26,7 @@ end-to-end in ~15 s via flash, correct file content, honest token/step view.
 ## P1 — documentation vs implementation drift
 
 **1 confirmed (fixed).** `dsh_worker_config` accepts `origin_depth_limit`,
-`preset_flash`, `preset_pro` — but the `/dsh-crew:config` command doc
+`preset_flash`, `preset_pro` — but the `/dsh-adapter:config` command doc
 (`commands/config.md`), its three siblings (`codex/prompts/dsh-config.md`,
 `agy/skills/dsh-config/SKILL.md`, `grok/commands/dsh-config.md`) and the session
 command tables in all 15 READMEs listed none of them. An agent that only reads

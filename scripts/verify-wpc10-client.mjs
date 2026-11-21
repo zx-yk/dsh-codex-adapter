@@ -17,7 +17,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const tmp = mkdtempSync(join(tmpdir(), 'dsh-crew-wpc10-'));
+const tmp = mkdtempSync(join(tmpdir(), 'dsh-adapter-wpc10-'));
 let failures = 0;
 function check(name, cond) {
   if (cond) console.log('  ok - ' + name);
@@ -177,7 +177,7 @@ try {
     basenameOf('/w/a/repo') === 'repo' && basenameOf('/w/a/repo/') === 'repo'
     && basenameOf(null) === '' && basenameOf('/') === '/');
   check('abbrevPath swaps $HOME for ~',
-    abbrevPath('/home/fini/workspace/dsh-plugins/dsh-crew', '/home/fini') === '~/workspace/dsh-plugins/dsh-crew');
+    abbrevPath('/home/fini/workspace/dsh-plugins/dsh-adapter', '/home/fini') === '~/workspace/dsh-plugins/dsh-adapter');
   const longAp = abbrevPath('/a/very/long/path/that/keeps/going/way/past/the/limit/repo');
   check('abbrevPath middle-ellipsizes while keeping head and tail',
     longAp.startsWith('/a/very') && longAp.endsWith('repo') && longAp.includes('…') && longAp.length <= 44);

@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
-  <sub><a href="https://github.com/ZSeven-W/dsh-crew">dsh-crew</a>（MIT）的独立分支 &mdash; 见 <a href="./NOTICE">NOTICE</a>。</sub>
+  <sub><a href="https://github.com/ZSeven-W/dsh-crew">dsh-adapter</a>（MIT）的独立分支 &mdash; 见 <a href="./NOTICE">NOTICE</a>。</sub>
 </p>
 
 <p align="center">
@@ -28,13 +28,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew 设置页" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter 设置页" width="100%" />
 </p>
-<p align="center"><sub>DSH Crew 设置页 —— 宿主集成、派发策略、执行方式与多模态桥</sub></p>
+<p align="center"><sub>DSH Adapter 设置页 —— 宿主集成、派发策略、执行方式与多模态桥</sub></p>
 
-## 为什么用 DSH Crew
+## 为什么用 DSH Adapter
 
-DSH Crew 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH，开源 agent harness）的插件，它让 DSH agent 可以从 Claude Code、Codex、Antigravity 与 Grok 里被派活：orchestrator 的模型不变，活由真正的 DSH agent 去干——用的是这套 harness 的工具、沙箱、预设与会话历史——而在宿主里它仍然是一个带实时进度的原生子代理。
+DSH Adapter 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH，开源 agent harness）的插件，它让 DSH agent 可以从 Claude Code、Codex、Antigravity 与 Grok 里被派活：orchestrator 的模型不变，活由真正的 DSH agent 去干——用的是这套 harness 的工具、沙箱、预设与会话历史——而在宿主里它仍然是一个带实时进度的原生子代理。
 
 干活的是 DSH agent，不是一次裸的模型调用。档位（`flash` / `pro`）决定这个 agent 从 harness 已配置的模型阵容里拿到多强的能力（目前是 DeepSeek V4 Flash 与 V4 Pro）——DSH 那边换模型，这边不用改。
 
@@ -83,7 +83,7 @@ DSH 用的模型是纯文本的。`describe_image` 现在只要有 key 就优先
 
 ### 📋 任务看板
 
-DSH Crew 面板同时是任务看板：每个 worker 任务——运行中或已结束——都带着档位、effort、实时进度与 token 列在板上，被持有的 workspace 会显示持有者；中途消失的任务（比如 hub 重启）会作为孤儿 ghost 浮出，而不是无声消失。
+DSH Adapter 面板同时是任务看板：每个 worker 任务——运行中或已结束——都带着档位、effort、实时进度与 token 列在板上，被持有的 workspace 会显示持有者；中途消失的任务（比如 hub 重启）会作为孤儿 ghost 浮出，而不是无声消失。
 
 </td>
 </tr>
@@ -122,14 +122,14 @@ Claude Code / Codex / Antigravity / Grok（orchestrator，模型不变）
 派发是可以铺开的。下面这次，18 个 worker 并行翻译这份 README：宿主把它们算作自己的子代理，harness 则把它们当作真实会话来跑。
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>Claude Code 里，dsh-crew worker 就是原生子代理；状态栏段实时显示在跑的档位、耗时与 token。</sub></p>
+<p align="center"><sub>Claude Code 里，dsh-adapter worker 就是原生子代理；状态栏段实时显示在跑的档位、耗时与 token。</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>DSH Crew 面板从 harness 一侧看同一次运行：每个任务由哪个宿主派出、档位与推理强度、实时进度与 token 消耗。</sub></p>
+<p align="center"><sub>DSH Adapter 面板从 harness 一侧看同一次运行：每个任务由哪个宿主派出、档位与推理强度、实时进度与 token 消耗。</sub></p>
 
 <p align="center"><sub>面板同时是任务看板：运行中与已结束的任务都带着档位、进度与 token 留在板上，被持有的 workspace 会标出持有者，中途消失的任务（hub 重启）会作为孤儿 ghost 浮出，而不是无声消失。</sub></p>
 
@@ -145,7 +145,7 @@ dsh web
 或者从源码树本地开发：
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -155,7 +155,7 @@ dsh web
 
 在 hub 模式下 — 即上面的安装方式 — worker 运行在 DSH 实例内部，使用 DSH 实例已配置的 DeepSeek 凭据。无需额外设置。
 
-仅 standalone 回落方案需要自己的 key：从宿主派发任务而没有 DSH 实例运行时，会启动一个独立的 worker runtime 进程。从 [platform.deepseek.com](https://platform.deepseek.com) 取 API key，写入 `~/.config/dsh-crew/.env`：
+仅 standalone 回落方案需要自己的 key：从宿主派发任务而没有 DSH 实例运行时，会启动一个独立的 worker runtime 进程。从 [platform.deepseek.com](https://platform.deepseek.com) 取 API key，写入 `~/.config/dsh-adapter/.env`：
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -169,7 +169,7 @@ node scripts/smoke.mjs
 
 smoke 测试会挑一条可用的路径派一个廉价任务——DSH 实例在跑就走 hub，否则走 standalone——并打印实际用的是哪条。十几秒内看到 `smoke test passed — configuration OK` 即配置成功。失败会打印具体原因，且只针对实际测的那条路径。
 
-然后打开 设置 → DSH Crew，一键装好宿主集成——Claude Code、Codex、Antigravity、Grok，或用命令行驱动同一个安装器：
+然后打开 设置 → DSH Adapter，一键装好宿主集成——Claude Code、Codex、Antigravity、Grok，或用命令行驱动同一个安装器：
 
 ```bash
 node src/install/cli.mjs claude   # Claude Code 插件：marketplace + 权限白名单 + HUD 状态段
@@ -196,7 +196,7 @@ node src/install/cli.mjs uninstall-claude
 
 一键安装（二选一）：
 
-- **DSH 设置页**（已装 hub 模式时）：设置 → DSH Crew → "安装到 Claude Code"
+- **DSH 设置页**（已装 hub 模式时）：设置 → DSH Adapter → "安装到 Claude Code"
 - **命令行**：`node src/install/cli.mjs all`
 
 两者做同样的事：注册本地 marketplace（父目录 `dsh-plugins/` 为 marketplace 根） + `claude plugin install` + MCP 工具权限白名单 + claude-hud worker 状态段配置（改动前自动备份 settings.json，幂等）。**安装后重启会话生效**。
@@ -208,7 +208,7 @@ node src/install/cli.mjs uninstall-claude
 - **HUD 状态栏段**：`⚙dsh 1▶pro 2m14s 21.7k/606 ✓3`（当前档位 / 耗时 / token 占用 / 完成计数）
   - 本地开发用 `statusline/statusline.sh` 或 `statusline/worker-segment.sh` 可独立集成
 - **超长任务**：CC 对 MCP 调用有超时限制（`MCP_TOOL_TIMEOUT` 可调），长任务可让 orchestrator 用 `dsh_spawn_worker` + `dsh_worker_result(wait_seconds)` 轮询
-- **本地开发调试**：`claude --plugin-dir /path/to/dsh-crew` 临时加载
+- **本地开发调试**：`claude --plugin-dir /path/to/dsh-adapter` 临时加载
 
 
 ### 会话命令
@@ -217,10 +217,10 @@ node src/install/cli.mjs uninstall-claude
 
 | 命令 | 作用 |
 |---|---|
-| `/dsh-crew:config` | 查看或设置本会话默认值：`tier=flash\|pro`、`effort=off\|high\|max`、`mode=auto\|hub\|standalone`、`timeout=<秒>`、`policy=auto\|flash-only\|pro-only`、`escalate=true\|false`、`origin_depth_limit=<1-32>`、`preset_flash/preset_pro=<preset id|default>`、`reset` |
-| `/dsh-crew:on` · `/dsh-crew:off` | 开关本会话的派发（关闭是硬开关，工具层直接拒绝） |
-| `/dsh-crew:status` | worker 任务实时状态：档位、进度、tokens、当前工具 |
-| `/dsh-crew:playbook` | 派发最佳实践：flash vs pro 选择、自包含任务简报、并行、结果验证、护栏 |
+| `/dsh-adapter:config` | 查看或设置本会话默认值：`tier=flash\|pro`、`effort=off\|high\|max`、`mode=auto\|hub\|standalone`、`timeout=<秒>`、`policy=auto\|flash-only\|pro-only`、`escalate=true\|false`、`origin_depth_limit=<1-32>`、`preset_flash/preset_pro=<preset id|default>`、`reset` |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | 开关本会话的派发（关闭是硬开关，工具层直接拒绝） |
+| `/dsh-adapter:status` | worker 任务实时状态：档位、进度、tokens、当前工具 |
+| `/dsh-adapter:playbook` | 派发最佳实践：flash vs pro 选择、自包含任务简报、并行、结果验证、护栏 |
 
 ## Codex
 
@@ -270,7 +270,7 @@ Codex 侧装的是三条 prompt：
 node src/install/cli.mjs agy
 ```
 
-把 dsh-crew MCP server 注册进 `~/.gemini/config/mcp_config.json`，并把 `ds-flash` / `ds-pro` agent 与 `dsh-config`、`dsh-status`、`dsh-playbook` skill 装进 `~/.gemini/config/`（改动前自动备份）。安装后重启会话生效。
+把 dsh-adapter MCP server 注册进 `~/.gemini/config/mcp_config.json`，并把 `ds-flash` / `ds-pro` agent 与 `dsh-config`、`dsh-status`、`dsh-playbook` skill 装进 `~/.gemini/config/`（改动前自动备份）。安装后重启会话生效。
 
 ### 使用
 
@@ -299,7 +299,7 @@ node src/install/cli.mjs agy
 node src/install/cli.mjs grok
 ```
 
-把 `[mcp_servers.dsh-crew]` 段写入 `~/.grok/config.toml`，并把 `ds-flash` / `ds-pro` agent 与 `/dsh-config`、`/dsh-status`、`/dsh-playbook` 命令装进 `~/.grok/`（改动前自动备份）。
+把 `[mcp_servers.dsh-adapter]` 段写入 `~/.grok/config.toml`，并把 `ds-flash` / `ds-pro` agent 与 `/dsh-config`、`/dsh-status`、`/dsh-playbook` 命令装进 `~/.grok/`（改动前自动备份）。
 
 ### 使用
 
@@ -331,7 +331,7 @@ node src/install/cli.mjs grok
 | `dsh_worker_cancel` | 取消指定 job，终止其 runtime 进程 |
 | `dsh_worker_config` | 查看/设置本会话默认值（tier、effort、mode、timeout、policy、escalation），并列出 `worker_profiles` |
 
-进度同时镜像到 `~/.config/dsh-crew/status.d/`（每个写入方一个分片文件，statusline / 外部监控可读）。
+进度同时镜像到 `~/.config/dsh-adapter/status.d/`（每个写入方一个分片文件，statusline / 外部监控可读）。
 
 ## 派发护栏
 
@@ -342,7 +342,7 @@ node src/install/cli.mjs grok
 
 ## 派发手册（playbook）
 
-如何把活派好——flash vs pro、自包含任务简报、安全并行、结果验证，以及上面的护栏——随包按宿主分发：`/dsh-crew:playbook`（Claude Code skill）、`/dsh-playbook`（Codex prompt、Antigravity skill、Grok 命令）。
+如何把活派好——flash vs pro、自包含任务简报、安全并行、结果验证，以及上面的护栏——随包按宿主分发：`/dsh-adapter:playbook`（Claude Code skill）、`/dsh-playbook`（Codex prompt、Antigravity skill、Grok 命令）。
 
 ## 显式 CLI 后端
 
@@ -352,7 +352,7 @@ node src/install/cli.mjs grok
 
 **DeepSeek 是纯文本模型**，不支持图片输入与生图输出。本插件通过 MCP 工具把这两项能力外借过来：
 
-**原生视觉优先**：当视觉 provider 是内置 CLI（或显式 `native`）时，`describe_image` 会先试 DeepSeek 自己的视觉模型 `deepseek-v4-flash-vision-exp`（直接 API 调用；key 来自 `DEEPSEEK_API_KEY` 或 `~/.config/dsh-crew/.env`）。任何失败都会优雅回落到下面的 CLI provider 链，这条链原样保留作为兜底。生图不受影响——原生模型只看图。
+**原生视觉优先**：当视觉 provider 是内置 CLI（或显式 `native`）时，`describe_image` 会先试 DeepSeek 自己的视觉模型 `deepseek-v4-flash-vision-exp`（直接 API 调用；key 来自 `DEEPSEEK_API_KEY` 或 `~/.config/dsh-adapter/.env`）。任何失败都会优雅回落到下面的 CLI provider 链，这条链原样保留作为兜底。生图不受影响——原生模型只看图。
 
 | 工具 | 说明 |
 |---|---|
@@ -363,7 +363,7 @@ node src/install/cli.mjs grok
 
 ### 配置
 
-在 **DSH 设置页 → DSH Crew → 多模态**（或直接编辑 `~/.config/dsh-crew/config.json`）配置：
+在 **DSH 设置页 → DSH Adapter → 多模态**（或直接编辑 `~/.config/dsh-adapter/config.json`）配置：
 
 **视觉 provider**（看图）：
 
@@ -407,15 +407,15 @@ node src/install/cli.mjs grok
 
 ## Hub 模式
 
-本包同时是合法的 DSH bundle（`dsh.bundle` + `cordis.patch.yml`）。执行 `dsh plugin add dsh-crew` 装进 DSH Web profile 后：
+本包同时是合法的 DSH bundle（`dsh.bundle` + `cordis.patch.yml`）。执行 `dsh plugin add dsh-adapter` 装进 DSH Web profile 后：
 
 - **Worker 会话一等公民化**：以 first-class session 运行在 DSH host 里（`agents.create` + per-session model/effort waterfall + 默认 preset），出现在 Web UI 会话列表，随时可点开围观完整执行过程
 - **按工作目录归类**：Web UI 中按 cwd 管理 worker 会话
 - **Loopback API**：
-  - `POST/GET /_dsh/dsh-crew/jobs`：spawn 任务、列表、长轮询结果、cancel
-  - `GET /_dsh/dsh-crew/ping`：健康探测（MCP shim 靠它判断 hub 是否在跑）
-  - `POST /_dsh/dsh-crew/install`：一键安装宿主集成——Claude Code / Codex / Antigravity / Grok（即 `src/install/` 的后端）
-- **自动探测**：各宿主的 MCP shim 自动探测 hub（`DSHPLUGIN_CREW_HUB` 环境变量，默认 `http://127.0.0.1:3080`）
+  - `POST/GET /_dsh/dsh-adapter/jobs`：spawn 任务、列表、长轮询结果、cancel
+  - `GET /_dsh/dsh-adapter/ping`：健康探测（MCP shim 靠它判断 hub 是否在跑）
+  - `POST /_dsh/dsh-adapter/install`：一键安装宿主集成——Claude Code / Codex / Antigravity / Grok（即 `src/install/` 的后端）
+- **自动探测**：各宿主的 MCP shim 自动探测 hub（`DSHPLUGIN_ADAPTER_HUB` 环境变量，默认 `http://127.0.0.1:3080`）
   - DSH Web 在跑 → job 进 hub 模式（`mode: "hub"`）
   - 没跑 → 回落 standalone runtime
 
@@ -439,7 +439,7 @@ node src/install/cli.mjs grok
 
 ### 跑着 DSH Web → Hub 模式自动启用
 
-- **现状**：若 `dsh plugin add dsh-crew` 装进 DSH Web profile，job 以一等公民会话跑在 host 里，出现在 Web UI 会话列表
+- **现状**：若 `dsh plugin add dsh-adapter` 装进 DSH Web profile，job 以一等公民会话跑在 host 里，出现在 Web UI 会话列表
 - **建议**：本地开发迭代时推荐启用 hub 模式，worker 进度可在 Web UI 完整围观；跨机器协作或无 Web UI 环境用派发宿主壳方案
 
 ### 已知事项

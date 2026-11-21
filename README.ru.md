@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
   <strong>Плагин <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: отправляйте работу агентам DSH из Claude Code / Codex / Antigravity / Grok, не отказываясь от встроенного интерфейса субагентов хоста.</strong><br />
@@ -24,13 +24,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew — settings page" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
-<p align="center"><sub>Страница настроек DSH Crew — интеграции хоста, политика отправки, выполнение и мультимодальный мост</sub></p>
+<p align="center"><sub>Страница настроек DSH Adapter — интеграции хоста, политика отправки, выполнение и мультимодальный мост</sub></p>
 
-## Зачем нужен DSH Crew
+## Зачем нужен DSH Adapter
 
-DSH Crew — плагин для [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH), опенсорсного агентского харнесса. Он позволяет отправлять работу агентам DSH из Claude Code, Codex, Antigravity и Grok: оркестратор сохраняет собственную модель, работа выполняется на настоящем агенте DSH с инструментами, песочницей, пресетами и историей сессий этого харнесса, а хост по-прежнему отображает его как встроенного субагента с живым прогрессом.
+DSH Adapter — плагин для [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH), опенсорсного агентского харнесса. Он позволяет отправлять работу агентам DSH из Claude Code, Codex, Antigravity и Grok: оркестратор сохраняет собственную модель, работа выполняется на настоящем агенте DSH с инструментами, песочницей, пресетами и историей сессий этого харнесса, а хост по-прежнему отображает его как встроенного субагента с живым прогрессом.
 
 Работу выполняет агент DSH, а не голый вызов модели. Уровни (`flash` / `pro`) определяют, какой объём возможностей получает агент из настроенного списка моделей харнесса — сегодня это DeepSeek V4 Flash и V4 Pro, — поэтому смена модели в DSH не требует изменений здесь.
 
@@ -79,7 +79,7 @@ DSH Crew — плагин для [DeepSeek Harness](https://github.com/deepseek-
 
 ### 📋 Доска задач
 
-Панель DSH Crew работает и как доска задач: каждое задание воркера — выполняющееся или завершённое — отображается с tier, effort, живым прогрессом и токенами; занятые рабочие директории показывают своих владельцев, а задание, исчезнувшее на лету (например, перезапуск hub), всплывает как осиротевший призрак, а не исчезает молча.
+Панель DSH Adapter работает и как доска задач: каждое задание воркера — выполняющееся или завершённое — отображается с tier, effort, живым прогрессом и токенами; занятые рабочие директории показывают своих владельцев, а задание, исчезнувшее на лету (например, перезапуск hub), всплывает как осиротевший призрак, а не исчезает молча.
 
 </td>
 </tr>
@@ -118,14 +118,14 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Диспетчеризация масштабируется вширь. Ниже восемнадцать worker'ов параллельно переводят этот README: хост считает их своими субагентами, а harness выполняет их как настоящие сессии.
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>В Claude Code worker'ы dsh-crew выглядят как нативные субагенты; сегмент statusline показывает работающие tier'ы, время и токены.</sub></p>
+<p align="center"><sub>В Claude Code worker'ы dsh-adapter выглядят как нативные субагенты; сегмент statusline показывает работающие tier'ы, время и токены.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>Панель DSH Crew показывает тот же запуск со стороны harness: какой хост отправил задачу, её tier и effort, прогресс и расход токенов.</sub></p>
+<p align="center"><sub>Панель DSH Adapter показывает тот же запуск со стороны harness: какой хост отправил задачу, её tier и effort, прогресс и расход токенов.</sub></p>
 
 <p align="center"><sub>Панель — это ещё и доска задач: выполняющиеся и завершённые задания остаются в списке с tier, прогрессом и токенами, занятые рабочие директории называют своих владельцев, а задание, исчезнувшее на лету (перезапуск hub), всплывает как осиротевший призрак, а не исчезает молча.</sub></p>
 
@@ -141,7 +141,7 @@ dsh web
 Или для локальной разработки прямо из исходников:
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -151,7 +151,7 @@ dsh web
 
 В режиме hub — установке выше — воркеры работают внутри экземпляра DSH и используют учётные данные DeepSeek, которые уже для него настроены. Ничего больше не нужно настраивать.
 
-Только standalone-режим (резервный вариант) требует собственного ключа: отправка с хоста без запущенного экземпляра DSH запускает worker runtime в отдельном процессе. Получите API-ключ на [platform.deepseek.com](https://platform.deepseek.com) и запишите его в `~/.config/dsh-crew/.env`:
+Только standalone-режим (резервный вариант) требует собственного ключа: отправка с хоста без запущенного экземпляра DSH запускает worker runtime в отдельном процессе. Получите API-ключ на [platform.deepseek.com](https://platform.deepseek.com) и запишите его в `~/.config/dsh-adapter/.env`:
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -165,7 +165,7 @@ node scripts/smoke.mjs
 
 Smoke test отправляет одно дешёвое задание по доступному пути — hub, если запущен экземпляр DSH, иначе standalone — и выводит, какой из них был использован. Примерно через десять секунд должно появиться `smoke test passed — configuration OK`. При ошибке печатается причина, относящаяся к проверенному пути.
 
-Затем откройте Настройки → DSH Crew и установите интеграции хостов — Claude Code, Codex, Antigravity, Grok — одним щелчком или запустите тот же установщик из командной строки:
+Затем откройте Настройки → DSH Adapter и установите интеграции хостов — Claude Code, Codex, Antigravity, Grok — одним щелчком или запустите тот же установщик из командной строки:
 
 ```bash
 node src/install/cli.mjs claude   # Claude Code plugin: marketplace + permissions + HUD segment
@@ -192,7 +192,7 @@ node src/install/cli.mjs uninstall-claude
 
 Установка в один клик (выберите один вариант):
 
-- **Страница настроек DSH** (когда установлен режим hub): Settings → DSH Crew → "Install to Claude Code"
+- **Страница настроек DSH** (когда установлен режим hub): Settings → DSH Adapter → "Install to Claude Code"
 - **Командная строка**: `node src/install/cli.mjs all`
 
 Оба варианта делают одно и то же: регистрируют локальный маркетплейс (родительская директория `dsh-plugins/` как корень маркетплейса) + `claude plugin install` + список разрешений инструментов MCP + настройка сегмента статуса воркеров claude-hud (автоматическое резервное копирование settings.json перед изменениями, идемпотентно). **После установки перезапустите сессию, чтобы изменения вступили в силу.**
@@ -204,7 +204,7 @@ node src/install/cli.mjs uninstall-claude
 - **Сегмент статусной строки HUD**: `⚙dsh 1▶pro 2m14s 21.7k/606 ✓3` (текущий уровень / затраченное время / расход токенов / количество завершённых)
   - При локальной разработке `statusline/statusline.sh` или `statusline/worker-segment.sh` можно интегрировать отдельно
 - **Длительные задачи**: у CC есть лимиты таймаута для вызовов MCP (`MCP_TOOL_TIMEOUT` настраивается); для долгих задач оркестратор может использовать `dsh_spawn_worker` + опрос через `dsh_worker_result(wait_seconds)`
-- **Локальная разработка и отладка**: `claude --plugin-dir /path/to/dsh-crew` для временной загрузки
+- **Локальная разработка и отладка**: `claude --plugin-dir /path/to/dsh-adapter` для временной загрузки
 
 
 ### Команды сессии
@@ -213,11 +213,11 @@ node src/install/cli.mjs uninstall-claude
 
 | Команда | Что делает |
 |---|---|
-| `/dsh-crew:config` | Показать или задать значения по умолчанию для сессии: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<секунды>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
+| `/dsh-adapter:config` | Показать или задать значения по умолчанию для сессии: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<секунды>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
 
-| `/dsh-crew:on` · `/dsh-crew:off` | Включить или выключить диспетчеризацию в этой сессии (выключено — жёсткий запрет: инструмент отказывает) |
-| `/dsh-crew:status` | Статус worker-задач в реальном времени: tier, прогресс, токены, текущий инструмент |
-| `/dsh-crew:playbook` | Лучшие практики диспетчеризации: выбор flash или pro, самодостаточные задания, параллелизм, проверка результатов, ограждения |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | Включить или выключить диспетчеризацию в этой сессии (выключено — жёсткий запрет: инструмент отказывает) |
+| `/dsh-adapter:status` | Статус worker-задач в реальном времени: tier, прогресс, токены, текущий инструмент |
+| `/dsh-adapter:playbook` | Лучшие практики диспетчеризации: выбор flash или pro, самодостаточные задания, параллелизм, проверка результатов, ограждения |
 
 ## Codex
 
@@ -268,7 +268,7 @@ cp codex/agents/*.toml ~/.codex/agents/    # global or project-level .codex/agen
 node src/install/cli.mjs agy
 ```
 
-Регистрирует MCP-сервер dsh-crew в `~/.gemini/config/mcp_config.json` и устанавливает агентов `ds-flash` / `ds-pro` вместе с навыками `dsh-config`, `dsh-status` и `dsh-playbook` в `~/.gemini/config/` (все файлы предварительно резервируются). После установки перезапустите сессию.
+Регистрирует MCP-сервер dsh-adapter в `~/.gemini/config/mcp_config.json` и устанавливает агентов `ds-flash` / `ds-pro` вместе с навыками `dsh-config`, `dsh-status` и `dsh-playbook` в `~/.gemini/config/` (все файлы предварительно резервируются). После установки перезапустите сессию.
 
 ### Использование
 
@@ -297,7 +297,7 @@ node src/install/cli.mjs agy
 node src/install/cli.mjs grok
 ```
 
-Записывает секцию `[mcp_servers.dsh-crew]` в `~/.grok/config.toml` и устанавливает агентов `ds-flash` / `ds-pro` вместе с командами `/dsh-config`, `/dsh-status` и `/dsh-playbook` в `~/.grok/` (все файлы предварительно резервируются).
+Записывает секцию `[mcp_servers.dsh-adapter]` в `~/.grok/config.toml` и устанавливает агентов `ds-flash` / `ds-pro` вместе с командами `/dsh-config`, `/dsh-status` и `/dsh-playbook` в `~/.grok/` (все файлы предварительно резервируются).
 
 ### Использование
 
@@ -329,7 +329,7 @@ node src/install/cli.mjs grok
 | `dsh_worker_cancel` | Отмена указанного задания и завершение его процесса рантайма |
 | `dsh_worker_config` | Чтение и задание значений по умолчанию сессии (tier, effort, mode, timeout, policy, escalation), а также список `worker_profiles` |
 
-Прогресс одновременно зеркалируется в `~/.config/dsh-crew/status.d/` (по одному файлу-шарду на источник записи; его может читать statusline или внешний мониторинг).
+Прогресс одновременно зеркалируется в `~/.config/dsh-adapter/status.d/` (по одному файлу-шарду на источник записи; его может читать statusline или внешний мониторинг).
 
 ## Ограждения диспетчеризации
 
@@ -340,7 +340,7 @@ node src/install/cli.mjs grok
 
 ## Плейбук диспетчеризации
 
-Как отправлять задачи *хорошо* — выбор flash или pro, самодостаточные задания, безопасный параллелизм, проверка результатов и описанные выше ограждения — собрано в плейбук для каждого хоста: `/dsh-crew:playbook` (навык Claude Code), `/dsh-playbook` (промпт Codex, навык Antigravity, команда Grok).
+Как отправлять задачи *хорошо* — выбор flash или pro, самодостаточные задания, безопасный параллелизм, проверка результатов и описанные выше ограждения — собрано в плейбук для каждого хоста: `/dsh-adapter:playbook` (навык Claude Code), `/dsh-playbook` (промпт Codex, навык Antigravity, команда Grok).
 
 ## Явные CLI-бэкенды
 
@@ -350,7 +350,7 @@ node src/install/cli.mjs grok
 
 **DeepSeek — текстовая модель**, не поддерживающая ввод и генерацию изображений. Этот плагин получает эти возможности извне через инструменты MCP:
 
-**Сначала нативное зрение**: когда провайдер зрения — встроенный CLI (или явно `native`), `describe_image` сначала пробует собственную VL-модель DeepSeek `deepseek-v4-flash-vision-exp` (прямой вызов API; ключ из `DEEPSEEK_API_KEY` или `~/.config/dsh-crew/.env`). Любая ошибка плавно деградирует к цепочке CLI-провайдеров ниже, которая остаётся резервным вариантом. Генерация изображений не затрагивается — нативная модель только смотрит на изображения.
+**Сначала нативное зрение**: когда провайдер зрения — встроенный CLI (или явно `native`), `describe_image` сначала пробует собственную VL-модель DeepSeek `deepseek-v4-flash-vision-exp` (прямой вызов API; ключ из `DEEPSEEK_API_KEY` или `~/.config/dsh-adapter/.env`). Любая ошибка плавно деградирует к цепочке CLI-провайдеров ниже, которая остаётся резервным вариантом. Генерация изображений не затрагивается — нативная модель только смотрит на изображения.
 
 | Инструмент | Описание |
 |---|---|
@@ -361,7 +361,7 @@ node src/install/cli.mjs grok
 
 ### Конфигурация
 
-На **странице настроек DSH → DSH Crew → Multimodal** (или отредактируйте `~/.config/dsh-crew/config.json` напрямую):
+На **странице настроек DSH → DSH Adapter → Multimodal** (или отредактируйте `~/.config/dsh-adapter/config.json` напрямую):
 
 **Провайдер зрения** (просмотр изображений):
 
@@ -405,15 +405,15 @@ node src/install/cli.mjs grok
 
 ## Режим hub
 
-Этот пакет также является полноценным бандлом DSH (`dsh.bundle` + `cordis.patch.yml`). После установки в профиль DSH Web командой `dsh plugin add dsh-crew`:
+Этот пакет также является полноценным бандлом DSH (`dsh.bundle` + `cordis.patch.yml`). После установки в профиль DSH Web командой `dsh plugin add dsh-adapter`:
 
 - **Сессии воркеров становятся полноценными**: выполняются как полноценные сессии в хосте DSH (`agents.create` + каскад модель/effort для каждой сессии + пресет по умолчанию), появляются в списке сессий веб-интерфейса, их можно открыть в любой момент, чтобы просмотреть полный ход выполнения
 - **Организация по рабочей директории**: управление сессиями воркеров по cwd в веб-интерфейсе
 - **Loopback API**:
-  - `POST/GET /_dsh/dsh-crew/jobs`: запуск задач, список, ожидание результатов (long-poll), отмена
-  - `GET /_dsh/dsh-crew/ping`: проверка работоспособности (MCP-прослойка использует её, чтобы определить, запущен ли hub)
-  - `POST /_dsh/dsh-crew/install`: установка интеграций хостов в один клик — Claude Code / Codex / Antigravity / Grok (бэкенд `src/install/`)
-- **Автоопределение**: MCP-прослойка хостов автоматически определяет hub (переменная окружения `DSHPLUGIN_CREW_HUB`, по умолчанию `http://127.0.0.1:3080`)
+  - `POST/GET /_dsh/dsh-adapter/jobs`: запуск задач, список, ожидание результатов (long-poll), отмена
+  - `GET /_dsh/dsh-adapter/ping`: проверка работоспособности (MCP-прослойка использует её, чтобы определить, запущен ли hub)
+  - `POST /_dsh/dsh-adapter/install`: установка интеграций хостов в один клик — Claude Code / Codex / Antigravity / Grok (бэкенд `src/install/`)
+- **Автоопределение**: MCP-прослойка хостов автоматически определяет hub (переменная окружения `DSHPLUGIN_ADAPTER_HUB`, по умолчанию `http://127.0.0.1:3080`)
   - DSH Web запущен → задания выполняются в режиме hub (`mode: "hub"`)
   - Не запущен → переключение на автономный рантайм
 
@@ -437,7 +437,7 @@ node src/install/cli.mjs grok
 
 ### Запущенный DSH Web → режим hub включается автоматически
 
-- **Текущее положение**: если `dsh plugin add dsh-crew` установлен в профиль DSH Web, задания выполняются как полноценные сессии в хосте и появляются в списке сессий веб-интерфейса
+- **Текущее положение**: если `dsh plugin add dsh-adapter` установлен в профиль DSH Web, задания выполняются как полноценные сессии в хосте и появляются в списке сессий веб-интерфейса
 - **Рекомендация**: при итерациях локальной разработки рекомендуется включать режим hub — прогресс воркеров можно полностью наблюдать в веб-интерфейсе; для совместной работы на разных машинах или сред без веб-интерфейса используйте подход с оболочкой хоста-отправителя
 
 ### Известные моменты

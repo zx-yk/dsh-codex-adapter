@@ -3,7 +3,7 @@
 // check here drives the REAL bundled MCP server (lib/server.mjs) over stdio,
 // with the only stub being the external agy binary itself (a PATH shim that
 // speaks agy's stream-json protocol). No real CLI tokens are spent and no
-// live hub is contacted (DSH_CREW_HUB points at a dead port, or at an
+// live hub is contacted (DSH_ADAPTER_HUB points at a dead port, or at an
 // in-process mock hub for the hub-path tests). scripts/smoke.mjs is
 // deliberately NOT run.
 //
@@ -83,7 +83,7 @@ function makeClient(child) {
 async function startServer(envExtra = {}) {
   const child = spawn(process.execPath, [join(REPO, 'lib', 'server.mjs')], {
     cwd: REPO,
-    env: { ...process.env, HOME: FAKE_HOME, DSH_CREW_HUB: DEAD_HUB, PATH: BIN + ':' + process.env.PATH, ...envExtra },
+    env: { ...process.env, HOME: FAKE_HOME, DSH_ADAPTER_HUB: DEAD_HUB, PATH: BIN + ':' + process.env.PATH, ...envExtra },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const client = makeClient(child);
@@ -141,10 +141,10 @@ check(DEFAULT_ORIGIN_DEPTH_LIMIT === 3, 'A0 depth limit default is 3', 'DEFAULT_
 // A4: env round-trip + garbage
 {
   const chain = [{ backend: 'standalone', cwd: dirA, source: 'claude-code' }, { backend: 'agy', cwd: dirB, source: 'codex' }];
-  const parsed = readInheritedOrigin({ DSH_CREW_ORIGIN_CHAIN: JSON.stringify(chain) });
+  const parsed = readInheritedOrigin({ DSH_ADAPTER_ORIGIN_CHAIN: JSON.stringify(chain) });
   check(parsed.depth === 2 && parsed.chain.length === 2 && parsed.chain[1].backend === 'agy',
     'A4 inherited chain parsed from env');
-  check(readInheritedOrigin({ DSH_CREW_ORIGIN_CHAIN: '{not json' }).depth === 0, 'A4b garbage env ignored');
+  check(readInheritedOrigin({ DSH_ADAPTER_ORIGIN_CHAIN: '{not json' }).depth === 0, 'A4b garbage env ignored');
   check(readInheritedOrigin({}).depth === 0, 'A4c no env = empty chain');
 }
 
@@ -202,7 +202,7 @@ sec('Phase B — bundled MCP server end-to-end with fake agy');
 {
   const chain = [1, 2, 3].map((i) => ({ backend: i === 3 ? 'agy' : 'standalone', cwd: join(WORK, 'b1hop' + i), source: 'claude-code' }));
   const capture = join(WORK, 'b1-capture');
-  const srv = await startServer({ DSH_CREW_ORIGIN_CHAIN: JSON.stringify(chain), DSH_CREW_DEPTH: '3', FAKE_AGY_CAPTURE: capture });
+  const srv = await startServer({ DSH_ADAPTER_ORIGIN_CHAIN: JSON.stringify(chain), DSH_ADAPTER_DEPTH: '3', FAKE_AGY_CAPTURE: capture });
   const r = await srv.call('dsh_run_worker', { task: 'say ok', worker: 'agy', cwd: dirB, timeout_seconds: 30 });
   console.log('      B1 tool response: ' + r.text.slice(0, 900));
   check(r.json?.error?.includes('origin guard') === true && r.json?.code === 'origin-depth-exceeded' && r.json?.depth === 4,
@@ -217,7 +217,7 @@ sec('Phase B — bundled MCP server end-to-end with fake agy');
 {
   const capture = join(WORK, 'b2-capture');
   const srv = await startServer({
-    DSH_CREW_ORIGIN_CHAIN: JSON.stringify([{ backend: 'agy', cwd: canonA, source: 'claude-code' }]), DSH_CREW_DEPTH: '1',
+    DSH_ADAPTER_ORIGIN_CHAIN: JSON.stringify([{ backend: 'agy', cwd: canonA, source: 'claude-code' }]), DSH_ADAPTER_DEPTH: '1',
     FAKE_AGY_CAPTURE: capture,
   });
   const r = await srv.call('dsh_run_worker', { task: 'say ok', worker: 'agy', cwd: dirA, timeout_seconds: 30 });
@@ -242,7 +242,7 @@ sec('Phase B — bundled MCP server end-to-end with fake agy');
   const capturedChain = existsSync(capture) ? readFileSync(capture, 'utf8') : '(no capture file)';
   const capturedDepth = existsSync(capture + '.depth') ? readFileSync(capture + '.depth', 'utf8') : '(no depth file)';
   check(capturedChain.includes('"agy"') && capturedChain.includes(normalizeCwd(dirB)) && capturedDepth === '1',
-    'B3 CLI child inherited the chain via DSH_CREW_ORIGIN_CHAIN/DSH_CREW_DEPTH env', 'chain=' + capturedChain + ' depth=' + capturedDepth);
+    'B3 CLI child inherited the chain via DSH_ADAPTER_ORIGIN_CHAIN/DSH_ADAPTER_DEPTH env', 'chain=' + capturedChain + ' depth=' + capturedDepth);
   const cfg = await srv.call('dsh_worker_config', {});
   check(cfg.json?.origin?.depth === 0 && cfg.json?.origin?.depth_limit === 3 && cfg.json?.origin_depth_limit === 3,
     'B3 dsh_worker_config shows inherited origin + default limit');
@@ -340,9 +340,9 @@ async function startMockHub() {
       res.end(s);
     };
     const url = new URL(req.url, 'http://localhost');
-    const route = url.pathname.slice('/_dsh/dsh-crew'.length);
+    const route = url.pathname.slice('/_dsh/dsh-adapter'.length);
     try {
-      if (route === '/ping') return send(200, { ok: true, service: 'dsh-crew-hub' });
+      if (route === '/ping') return send(200, { ok: true, service: 'dsh-adapter-hub' });
       if (route === '/jobs' && req.method === 'GET') return send(200, { ok: true, jobs: [...state.jobs.values()] });
       if (route === '/jobs' && req.method === 'POST') {
         let body = '';
@@ -386,7 +386,7 @@ async function startMockHub() {
 
 {
   const mock = await startMockHub();
-  const srv = await startServer({ DSH_CREW_HUB: mock.url });
+  const srv = await startServer({ DSH_ADAPTER_HUB: mock.url });
 
   const first = await srv.call('dsh_spawn_worker', { task: 'hub task', cwd: dirF });
   const hubId = first.json?.id;

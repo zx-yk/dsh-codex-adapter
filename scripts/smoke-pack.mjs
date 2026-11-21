@@ -177,7 +177,7 @@ async function handshake(serverRel, label) {
   console.log('--- initialize response (raw) ---');
   console.log(responses[responses.length - 1]);
   const info = init.result && init.result.serverInfo;
-  if (!info || info.name !== 'dsh-crew') fail(label + ': serverInfo.name is ' + JSON.stringify(info && info.name) + ', expected dsh-crew');
+  if (!info || info.name !== 'dsh-adapter') fail(label + ': serverInfo.name is ' + JSON.stringify(info && info.name) + ', expected dsh-adapter');
 
   send({ jsonrpc: '2.0', method: 'notifications/initialized' });
 
@@ -200,12 +200,12 @@ async function handshake(serverRel, label) {
 // 1. Pack the current tree. prepack runs smoke:mcp (rebuild + bundle
 //    assertions), so a stale or broken lib/server.mjs cannot get packed.
 console.log('[smoke:pack] 1/5 npm pack (prepack runs smoke:mcp first) ...');
-const packDir = mkdtempSync(join(tmpdir(), 'dsh-crew-pack-'));
+const packDir = mkdtempSync(join(tmpdir(), 'dsh-adapter-pack-'));
 tempDirs.push(packDir);
 // Hermetic npm cache: a shared ~/.npm cache can be stale, or (as seen on
 // the author's machine) hold root-owned leftovers from older npm versions,
 // which would fail this test with EPERM instead of testing the tarball.
-const cacheDir = mkdtempSync(join(tmpdir(), 'dsh-crew-npm-cache-'));
+const cacheDir = mkdtempSync(join(tmpdir(), 'dsh-adapter-npm-cache-'));
 tempDirs.push(cacheDir);
 const packOut = run('npm', ['pack', '--cache', cacheDir, '--pack-destination', packDir], { cwd: ROOT, env: { npm_config_cache: cacheDir } });
 console.log(packOut.split('\n').slice(-6).join('\n'));
@@ -218,7 +218,7 @@ console.log('[smoke:pack] tarball: ' + tarballPath + ' (' + statSync(tarballPath
 // 2. Install into a brand-new empty directory - the external-user scenario
 //    from issue #3 that never worked before.
 console.log('\n[smoke:pack] 2/5 npm init -y && npm i ' + tarballPath);
-const installDir = mkdtempSync(join(tmpdir(), 'dsh-crew-install-'));
+const installDir = mkdtempSync(join(tmpdir(), 'dsh-adapter-install-'));
 tempDirs.push(installDir);
 console.log(run('npm', ['init', '-y', '--cache', cacheDir], { cwd: installDir, env: { npm_config_cache: cacheDir } }).split('\n').slice(0, 3).join('\n'));
 const installOut = run('npm', ['i', tarballPath, '--cache', cacheDir], { cwd: installDir, timeoutMs: 600_000, env: { npm_config_cache: cacheDir } });

@@ -8,13 +8,13 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const MARKETPLACE_NAME = 'dsh-crew';
-const PLUGIN_KEY = `dsh-crew@${MARKETPLACE_NAME}`;
+const MARKETPLACE_NAME = 'dsh-adapter';
+const PLUGIN_KEY = `dsh-adapter@${MARKETPLACE_NAME}`;
 const MCP_TOOLS = ['dsh_run_worker', 'dsh_spawn_worker', 'dsh_worker_status', 'dsh_worker_result', 'dsh_worker_cancel'];
 
 function backup(file) {
   if (existsSync(file)) {
-    const bak = `${file}.dsh-crew-backup-${Date.now()}`;
+    const bak = `${file}.dsh-adapter-backup-${Date.now()}`;
     copyFileSync(file, bak);
     return bak;
   }
@@ -57,18 +57,21 @@ export function tomlString(s) {
   return JSON.stringify(String(s)).replace(/\x7f/g, '\\u007f');
 }
 
-// One-time migration from the pre-rename config dir (dsh-workers → dsh-crew).
+// One-time migration of the config dir across renames:
+//   dsh-workers -> dsh-adapter (this plugin's older name), then
+//   dsh-crew    -> dsh-adapter (the name before the crew->adapter rebrand).
+// The newest directory wins: a user who already has dsh-adapter keeps it.
 try {
-  const oldDir = join(homedir(), '.config', 'dsh-workers');
-  const newDir = join(homedir(), '.config', 'dsh-crew');
-  if (existsSync(oldDir) && !existsSync(newDir)) {
-    const { renameSync } = await import('node:fs');
-    renameSync(oldDir, newDir);
+  const { renameSync } = await import('node:fs');
+  const newDir = join(homedir(), '.config', 'dsh-adapter');
+  for (const legacy of ['dsh-workers', 'dsh-crew']) {
+    const oldDir = join(homedir(), '.config', legacy);
+    if (existsSync(oldDir) && !existsSync(newDir)) renameSync(oldDir, newDir);
   }
 } catch {}
 
 const GLOBAL_CONFIG_FILE = join(CONFIG_DIR_HOME(), 'config.json');
-function CONFIG_DIR_HOME() { return join(homedir(), '.config', 'dsh-crew'); }
+function CONFIG_DIR_HOME() { return join(homedir(), '.config', 'dsh-adapter'); }
 
 export const GLOBAL_CONFIG_DEFAULTS = {
   default_tier: 'flash',
@@ -83,8 +86,8 @@ export const GLOBAL_CONFIG_DEFAULTS = {
   escalate_on_failure: false,
   // Multimodal bridge: which subscription CLI lends the text-only DS model
   // eyes (describe_image) and a brush (generate_image).
-  vision_provider: 'claude-code', // claude-code | codex | grok | agy | <custom id> | off
-  vision_model: 'haiku', // model passed to the vision CLI; free-form
+  vision_provider: 'codex', // codex | claude-code | grok | agy | <custom id> | off
+  vision_model: 'default', // model passed to the vision CLI; free-form
   imagegen_provider: 'codex', // codex | agy | grok | <custom id> | off
   // User-defined providers, each either an OpenAI-compatible HTTP endpoint or a
   // local command. Entry shape:
@@ -134,10 +137,10 @@ export function installStatus({ home = homedir() } = {}) {
     && settings.statusLine.command.includes('worker-segment.sh');
   const codexInstalled = existsSync(join(home, '.codex', 'agents', 'ds-flash.toml'));
   const agyMcp = readJson(join(home, '.gemini', 'config', 'mcp_config.json'), {});
-  const agyInstalled = !!(agyMcp.mcpServers && agyMcp.mcpServers['dsh-crew'])
+  const agyInstalled = !!(agyMcp.mcpServers && agyMcp.mcpServers['dsh-adapter'])
     || existsSync(join(home, '.gemini', 'config', 'agents', 'ds-flash.md'));
   const grokTxt = readText(join(home, '.grok', 'config.toml'));
-  const grokInstalled = grokTxt.includes('[mcp_servers.dsh-crew]')
+  const grokInstalled = grokTxt.includes('[mcp_servers.dsh-adapter]')
     || existsSync(join(home, '.grok', 'agents', 'ds-flash.md'));
   return {
     claude: { installed: claudeInstalled, hud: hudWired },
@@ -210,7 +213,7 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
     actions.push(`removed ${preRename.length} pre-rename permission rules`);
   }
   for (const tool of MCP_TOOLS) {
-    const rule = `mcp__plugin_dsh-crew_dsh-crew__${tool}`;
+    const rule = `mcp__plugin_dsh-adapter_dsh-adapter__${tool}`;
     if (!allow.includes(rule)) allow.push(rule);
   }
   settings.permissions.allow = allow;
@@ -306,9 +309,9 @@ export function installAgy({ home = homedir() } = {}) {
   if (bak) actions.push(`backup: ${bak}`);
   const cfg = readJson(mcpFile, {});
   cfg.mcpServers = cfg.mcpServers ?? {};
-  cfg.mcpServers['dsh-crew'] = { command: 'node', args: [serverPath], disabled: false };
+  cfg.mcpServers['dsh-adapter'] = { command: 'node', args: [serverPath], disabled: false };
   writeFileSync(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
-  actions.push(`mcp: registered dsh-crew (node ${serverPath}) in ${mcpFile}`);
+  actions.push(`mcp: registered dsh-adapter (node ${serverPath}) in ${mcpFile}`);
 
   // 2. Agent definitions (no path rendering needed — agy reads the global MCP
   //    config itself, so the roles never embed a server path).
@@ -339,11 +342,11 @@ export function uninstallAgy({ home = homedir() } = {}) {
 
   const mcpFile = join(home, '.gemini', 'config', 'mcp_config.json');
   const cfg = readJson(mcpFile, null);
-  if (cfg && cfg.mcpServers && cfg.mcpServers['dsh-crew']) {
+  if (cfg && cfg.mcpServers && cfg.mcpServers['dsh-adapter']) {
     backup(mcpFile);
-    delete cfg.mcpServers['dsh-crew'];
+    delete cfg.mcpServers['dsh-adapter'];
     writeFileSync(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
-    actions.push(`mcp: removed dsh-crew from ${mcpFile} (backup kept)`);
+    actions.push(`mcp: removed dsh-adapter from ${mcpFile} (backup kept)`);
   }
 
   for (const f of ['ds-flash.md', 'ds-pro.md']) {
@@ -367,7 +370,7 @@ export function uninstallAgy({ home = homedir() } = {}) {
 
   // Tool-schema caches (regenerable — agy re-creates them on next server use).
   for (const flavour of ['antigravity', 'antigravity-cli', 'antigravity-ide']) {
-    const p = join(home, '.gemini', flavour, 'mcp', 'dsh-crew');
+    const p = join(home, '.gemini', flavour, 'mcp', 'dsh-adapter');
     if (existsSync(p)) {
       rmSync(p, { recursive: true, force: true });
       actions.push(`removed mcp cache: ${p}`);
@@ -394,16 +397,16 @@ export function installGrok({ home = homedir() } = {}) {
   }
 
   // 1. MCP server section in ~/.grok/config.toml (idempotent: replace the
-  //    existing [mcp_servers.dsh-crew] block if present, keep the rest).
+  //    existing [mcp_servers.dsh-adapter] block if present, keep the rest).
   const cfgFile = join(home, '.grok', 'config.toml');
   mkdirSync(dirname(cfgFile), { recursive: true });
   const bak = backup(cfgFile);
   if (bak) actions.push(`backup: ${bak}`);
   let toml = readText(cfgFile);
-  toml = removeTomlSection(toml, 'mcp_servers.dsh-crew').replace(/\n+$/, '');
-  toml += `\n\n[mcp_servers.dsh-crew]\ncommand = "node"\nargs = [${tomlString(serverPath)}]\nenabled = true\n`;
+  toml = removeTomlSection(toml, 'mcp_servers.dsh-adapter').replace(/\n+$/, '');
+  toml += `\n\n[mcp_servers.dsh-adapter]\ncommand = "node"\nargs = [${tomlString(serverPath)}]\nenabled = true\n`;
   writeFileSync(cfgFile, toml);
-  actions.push(`mcp: registered dsh-crew (node ${serverPath}) in ${cfgFile}`);
+  actions.push(`mcp: registered dsh-adapter (node ${serverPath}) in ${cfgFile}`);
 
   // 2. Agent definitions.
   const agentsDir = join(home, '.grok', 'agents');
@@ -435,15 +438,15 @@ export function uninstallGrok({ home = homedir() } = {}) {
   const cfgFile = join(home, '.grok', 'config.toml');
   if (existsSync(cfgFile)) {
     const before = readText(cfgFile);
-    let after = removeTomlSection(before, 'mcp_servers.dsh-crew');
-    // Drop dsh-crew from any disabled_mcp_servers list grok may have written.
-    after = after.split('\n').map((l) => (l.includes('disabled_mcp_servers') && l.includes('dsh-crew')
-      ? l.replace(/"dsh-crew"\s*,?\s*/g, '').replace(/,\s*\]/g, ']')
+    let after = removeTomlSection(before, 'mcp_servers.dsh-adapter');
+    // Drop dsh-adapter from any disabled_mcp_servers list grok may have written.
+    after = after.split('\n').map((l) => (l.includes('disabled_mcp_servers') && l.includes('dsh-adapter')
+      ? l.replace(/"dsh-adapter"\s*,?\s*/g, '').replace(/,\s*\]/g, ']')
       : l)).join('\n');
     if (after !== before) {
       backup(cfgFile);
       writeFileSync(cfgFile, after.replace(/\n{3,}$/, '\n'));
-      actions.push(`mcp: removed dsh-crew from ${cfgFile} (backup kept)`);
+      actions.push(`mcp: removed dsh-adapter from ${cfgFile} (backup kept)`);
     }
   }
 
@@ -506,7 +509,7 @@ export function installHudSegment({ home = homedir() } = {}) {
 
 /**
  * Array-form extraKnownMarketplaces entries are keyed objects shaped like
- * { "dsh-crew": { source: { source: 'directory', path } } } — never arrays
+ * { "dsh-adapter": { source: { source: 'directory', path } } } — never arrays
  * of paths. Match any element that names this marketplace, or whose
  * directory (source.path, or a top-level path for safety) resolves to the
  * repo ROOT this installer registers.
@@ -538,7 +541,7 @@ export async function uninstallClaudeCode({ home = homedir() } = {}) {
     delete settings.enabledPlugins[PLUGIN_KEY];
   }
   if (settings.permissions?.allow) {
-    settings.permissions.allow = settings.permissions.allow.filter((r) => !r.startsWith('mcp__plugin_dsh-crew_'));
+    settings.permissions.allow = settings.permissions.allow.filter((r) => !r.startsWith('mcp__plugin_dsh-adapter_'));
   }
   writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   actions.push('settings: unregistered from settings.json (backup kept)');

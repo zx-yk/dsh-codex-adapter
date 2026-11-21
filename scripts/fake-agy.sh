@@ -3,15 +3,15 @@
 # cli-workers adapter parses (init / step_update / result). Behavior is
 # controlled through env: FAKE_AGY_MODE / FAKE_AGY_MODE_FILE (NORMAL|HANG),
 # FAKE_AGY_DELAY_MS / FAKE_AGY_DELAY_FILE (ms before the result event),
-# FAKE_AGY_CAPTURE (if set, the inherited DSH_CREW_ORIGIN_CHAIN / _DEPTH are
+# FAKE_AGY_CAPTURE (if set, the inherited DSH_ADAPTER_ORIGIN_CHAIN / _DEPTH are
 # written next to it so tests can assert env propagation).
 mode="${FAKE_AGY_MODE:-NORMAL}"
 [ -n "${FAKE_AGY_MODE_FILE:-}" ] && mode="$(cat "$FAKE_AGY_MODE_FILE")"
 delay_ms="${FAKE_AGY_DELAY_MS:-150}"
 [ -n "${FAKE_AGY_DELAY_FILE:-}" ] && delay_ms="$(cat "$FAKE_AGY_DELAY_FILE")"
 if [ -n "${FAKE_AGY_CAPTURE:-}" ]; then
-  printf '%s' "${DSH_CREW_ORIGIN_CHAIN:-}" > "$FAKE_AGY_CAPTURE"
-  printf '%s' "${DSH_CREW_DEPTH:-}" > "$FAKE_AGY_CAPTURE.depth"
+  printf '%s' "${DSH_ADAPTER_ORIGIN_CHAIN:-}" > "$FAKE_AGY_CAPTURE"
+  printf '%s' "${DSH_ADAPTER_DEPTH:-}" > "$FAKE_AGY_CAPTURE.depth"
 fi
 printf '%s\n' '{"event":"init","init":{"permission_mode":"acceptEdits","tools":[]}}'
 sleep 0.05

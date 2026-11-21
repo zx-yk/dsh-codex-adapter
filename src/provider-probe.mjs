@@ -9,12 +9,12 @@ export async function probeProvider(llm, binding, { timeoutMs = 20000 } = {}) {
   const collect = async () => {
     let finish, matched = false;
     for await (const chunk of llm.stream({ ...binding, maxTokens: 256, signal: controller.signal,
-      messages: [{ role: 'user', content: [{ type: 'text', text: `Call dsh_crew_probe_noop exactly once with nonce ${nonce}. This tool has no side effects. Do not answer with prose.` }] }],
-      tools: [{ name: 'dsh_crew_probe_noop', description: 'A capability check with no filesystem or network effects.', parameters: {
+      messages: [{ role: 'user', content: [{ type: 'text', text: `Call dsh_adapter_probe_noop exactly once with nonce ${nonce}. This tool has no side effects. Do not answer with prose.` }] }],
+      tools: [{ name: 'dsh_adapter_probe_noop', description: 'A capability check with no filesystem or network effects.', parameters: {
         type: 'object', properties: { nonce: { type: 'string' } }, required: ['nonce'], additionalProperties: false,
       } }],
     })) {
-      if (chunk.type === 'block-end' && chunk.block?.type === 'tool-call' && chunk.block.name === 'dsh_crew_probe_noop') {
+      if (chunk.type === 'block-end' && chunk.block?.type === 'tool-call' && chunk.block.name === 'dsh_adapter_probe_noop') {
         try { const args = JSON.parse(chunk.block.arguments); if (args?.nonce === nonce && Object.keys(args).length === 1) matched = true; } catch {}
       }
       if (chunk.type === 'finish') finish = chunk.reason?.kind;

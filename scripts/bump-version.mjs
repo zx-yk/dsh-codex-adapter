@@ -70,8 +70,10 @@ for (const [file, edit] of edits) {
 }
 
 // Rebuild makes lib/server.mjs carry the new version; the pnpm lockfile keeps
-// the bundle byte-identical apart from that string.
-execFileSync('pnpm', ['run', 'build'], { cwd: ROOT, stdio: 'inherit' });
+// the bundle byte-identical apart from that string. Run npm's CLI through node
+// rather than the pnpm shim, which execFile cannot start on Windows.
+const npmCli = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+execFileSync(process.execPath, [npmCli, 'run', 'build'], { cwd: ROOT, stdio: 'inherit' });
 
 console.log(`\n${current} -> ${next}`);
 console.log('Next: run pnpm run smoke:pack, commit, then npm publish --access public');

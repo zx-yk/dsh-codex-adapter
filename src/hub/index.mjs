@@ -56,7 +56,7 @@ function userMessage(text) {
  */
 export function unattendedQuestion() {
   const error = new Error(
-    'no one is attending this dsh-crew worker session, so a question cannot be answered and must not be waited on. '
+    'no one is attending this dsh-adapter worker session, so a question cannot be answered and must not be waited on. '
     + 'Stop and put the unresolved question in your final message so the orchestrator can obtain the required answer or approval. '
     + 'An unanswered question grants no permission; never select an option automatically.',
   );
@@ -65,7 +65,7 @@ export function unattendedQuestion() {
   return error;
 }
 
-export const name = 'dsh-crew';
+export const name = 'dsh-adapter';
 export const inject = ['agents', 'sessions', 'agentDefaultModel', 'tools', 'llm', 'attachments'];
 
 // Optional: the host's durable locale preference seeds server-side strings
@@ -79,12 +79,12 @@ function seedLangFromHost(ctx) {
 
 import { setLang } from '../i18n.mjs';
 
-const ROUTE_BASE = '/_dsh/dsh-crew';
+const ROUTE_BASE = '/_dsh/dsh-adapter';
 // Tier -> {provider, model}. The defaults live in tier-binding.mjs; the
 // caller may override per dispatch, and the hub's own config is the fallback
 // when it does not (the same shape the preset lookup below uses).
 import { describeBindings, resolveTierBinding, TIERS } from '../tier-binding.mjs';
-const CONFIG_DIR = join(homedir(), '.config', 'dsh-crew');
+const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 
 // ---------- job registry ----------
 
@@ -220,7 +220,7 @@ export class WorkerRegistry {
           await ws.attachSession(sessionId);
         }
       } catch (err) {
-        this.ctx.logger?.warn?.(`dsh-crew: workspace attach failed for ${cwdPath}: ${err?.message ?? err}`);
+        this.ctx.logger?.warn?.(`dsh-adapter: workspace attach failed for ${cwdPath}: ${err?.message ?? err}`);
       }
       await handle.agent.whenIdle();
       handle.agent.followup(userMessage(task));
@@ -357,10 +357,10 @@ export async function apply(ctx) {
     const { createMultimodalTools } = await import('../multimodal.mjs');
     const { readGlobalConfig } = await import('../install/install.mjs');
     for (const tool of createMultimodalTools(() => readGlobalConfig())) {
-      disposers.push(ctx.effect(() => ctx.tools.register(tool), `dsh-crew: ${tool.name} tool`));
+      disposers.push(ctx.effect(() => ctx.tools.register(tool), `dsh-adapter: ${tool.name} tool`));
     }
   } catch (err) {
-    ctx.logger?.warn?.(`dsh-crew: multimodal tools unavailable: ${err?.message ?? err}`);
+    ctx.logger?.warn?.(`dsh-adapter: multimodal tools unavailable: ${err?.message ?? err}`);
   }
 
   // Vision route: image paste on the text-only DS models (admission adapter +
@@ -370,7 +370,7 @@ export async function apply(ctx) {
     const { readGlobalConfig } = await import('../install/install.mjs');
     disposers.push(installVisionRoute(ctx, () => readGlobalConfig()));
   } catch (err) {
-    ctx.logger?.warn?.(`dsh-crew: vision route unavailable: ${err?.message ?? err}`);
+    ctx.logger?.warn?.(`dsh-adapter: vision route unavailable: ${err?.message ?? err}`);
   }
 
   ctx.inject(['webServer'], (webCtx) => {
@@ -394,7 +394,7 @@ export async function apply(ctx) {
 
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/ping`,
-      handler: (req, res) => sendJson(res, 200, { ok: true, service: 'dsh-crew-hub' }),
+      handler: (req, res) => sendJson(res, 200, { ok: true, service: 'dsh-adapter-hub' }),
     }));
 
     // WPC14: liveness probe for a ghost job's recorded pid. The panel probes
@@ -635,7 +635,7 @@ export async function apply(ctx) {
     return () => { for (const d of disposers.reverse()) d(); };
   });
 
-  ctx.logger?.info?.('dsh-crew hub mounted (jobs API + installer endpoints + multimodal tools)');
+  ctx.logger?.info?.('dsh-adapter hub mounted (jobs API + installer endpoints + multimodal tools)');
   return async () => {
     for (const d of disposers.reverse()) { try { d(); } catch {} }
     await hub.dispose();

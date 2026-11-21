@@ -1,5 +1,5 @@
 // Sharded worker-status publishing: every writer (hub process, per-session
-// standalone MCP server) owns one file under ~/.config/dsh-crew/status.d/
+// standalone MCP server) owns one file under ~/.config/dsh-adapter/status.d/
 // and readers merge all fresh shards. Kills the last-writer-wins race that a
 // single shared status.json had with multiple concurrent writers.
 
@@ -7,7 +7,7 @@ import { writeFileSync, mkdirSync, rmSync, readdirSync, readFileSync } from 'nod
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
-const CONFIG_DIR = join(homedir(), '.config', 'dsh-crew');
+const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 const SHARD_DIR = join(CONFIG_DIR, 'status.d');
 export const SHARD_FRESH_MS = 30 * 60 * 1000;
 

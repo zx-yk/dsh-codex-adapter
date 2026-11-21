@@ -42,8 +42,8 @@ function capture(cmd, argv) {
 }
 
 // pnpm keeps the lockfile authoritative, but a machine without pnpm can use
-// npm for the same scripts; force one with CREW_PM=pnpm|npm.
-const pm = process.env.CREW_PM || (capture('pnpm', ['--version']) ? 'pnpm' : 'npm');
+// npm for the same scripts; force one with ADAPTER_PM=pnpm|npm.
+const pm = process.env.ADAPTER_PM || (capture('pnpm', ['--version']) ? 'pnpm' : 'npm');
 console.log(`package manager: ${pm} | ${pkg.name}@${version}`);
 
 if (!force) {

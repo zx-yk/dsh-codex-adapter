@@ -1,8 +1,8 @@
 // Origin-chain guard against recursive worker self-amplification (WPC9 guardrail 1).
 //
 // Every dispatch carries an origin chain: the ordered list of (backend, cwd)
-// hops the task has already travelled. A crew-enabled host can itself be
-// someone else's worker — CC dispatches to codex, codex (crew installed)
+// hops the task has already travelled. A adapter-enabled host can itself be
+// someone else's worker — CC dispatches to codex, codex (adapter installed)
 // dispatches back — and without a guard the host×backend matrix lets one
 // worker spawn another forever: quota burns through in minutes while every
 // single vantage point along the chain looks innocent.
@@ -13,16 +13,16 @@
 //     source: orchestrator id of the dispatching host ('claude-code', 'codex', ...) }
 //
 // Cross-process transport:
-//   - This MCP server reads DSH_CREW_ORIGIN_CHAIN (JSON array of hops) at
-//     startup and inherits it as INHERITED_ORIGIN; crew instances spawned
+//   - This MCP server reads DSH_ADAPTER_ORIGIN_CHAIN (JSON array of hops) at
+//     startup and inherits it as INHERITED_ORIGIN; adapter instances spawned
 //     down-chain do the same, so the chain survives process boundaries.
 //   - Every dispatch appends its own hop and passes the extended chain to the
-//     worker: env vars DSH_CREW_ORIGIN_CHAIN / DSH_CREW_DEPTH for CLI and
+//     worker: env vars DSH_ADAPTER_ORIGIN_CHAIN / DSH_ADAPTER_DEPTH for CLI and
 //     standalone children (jobs.mjs / cli-workers.mjs spawn env), and
 //     origin_chain / origin_depth spec fields for hub spawns (hub-client is
 //     unchanged; the current hub ignores unknown spec fields and this
 //     client-side session re-attaches them to every hub view it returns).
-//   - DSH_CREW_DEPTH is written alongside as an integer for observability but
+//   - DSH_ADAPTER_DEPTH is written alongside as an integer for observability but
 //     is never trusted on read: the chain is authoritative and depth is
 //     derived from its length (env can be hostile).
 //
@@ -33,8 +33,8 @@
 
 import { normalizeCwd } from './cwd-lock.mjs';
 
-export const ORIGIN_CHAIN_ENV = 'DSH_CREW_ORIGIN_CHAIN';
-export const ORIGIN_DEPTH_ENV = 'DSH_CREW_DEPTH';
+export const ORIGIN_CHAIN_ENV = 'DSH_ADAPTER_ORIGIN_CHAIN';
+export const ORIGIN_DEPTH_ENV = 'DSH_ADAPTER_DEPTH';
 
 // Why 3: depth = number of dispatch hops. 1 is a direct worker, 2 a worker
 // delegating once, 3 one more legitimate re-delegation — real fan-out graphs

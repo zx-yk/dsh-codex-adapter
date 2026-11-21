@@ -1,12 +1,12 @@
 #!/bin/bash
 # Compact DSH worker segment for claude-hud --extra-cmd (or any statusline).
-# Merges all fresh status shards (~/.config/dsh-crew/status.d/*.json plus
+# Merges all fresh status shards (~/.config/dsh-adapter/status.d/*.json plus
 # the legacy status.json during transition) so workers dispatched by ANY
 # orchestrator on this machine are visible. Running jobs show tier, elapsed,
 # and tokens; idle with history shows "⚙dsh ✓N"; no jobs prints nothing.
-# Override the shard dir with $DSH_CREW_STATUS_DIR (mainly for tests).
+# Override the shard dir with $DSH_ADAPTER_STATUS_DIR (mainly for tests).
 
-dir="${DSH_CREW_STATUS_DIR:-$HOME/.config/dsh-crew}"
+dir="${DSH_ADAPTER_STATUS_DIR:-$HOME/.config/dsh-adapter}"
 files=()
 for f in "$dir"/status.d/*.json "$dir"/status.json; do
   [ -f "$f" ] && files+=("$f")

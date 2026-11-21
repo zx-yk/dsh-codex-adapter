@@ -27,20 +27,20 @@ function capture() {
 test('the new prefix does not collide with the reserved one', () => {
   // The whole point: DSH's blacklist matches names STARTING WITH "DSH_".
   assert.equal(PLUGIN_ENV_PREFIX.startsWith(LEGACY_ENV_PREFIX), false);
-  assert.equal(pluginEnvName('CREW_HUB'), 'DSHPLUGIN_CREW_HUB');
-  assert.equal(legacyEnvName('CREW_HUB'), 'DSH_CREW_HUB');
+  assert.equal(pluginEnvName('ADAPTER_HUB'), 'DSHPLUGIN_ADAPTER_HUB');
+  assert.equal(legacyEnvName('ADAPTER_HUB'), 'DSH_ADAPTER_HUB');
 });
 
 test('the new name wins, the legacy name is the fallback, absence is undefined', () => {
   resetPluginEnvWarnings();
   const sink = capture();
   assert.equal(
-    pluginEnv('CREW_HUB', { env: { DSHPLUGIN_CREW_HUB: 'new', DSH_CREW_HUB: 'old' }, warn: sink.warn }),
+    pluginEnv('ADAPTER_HUB', { env: { DSHPLUGIN_ADAPTER_HUB: 'new', DSH_ADAPTER_HUB: 'old' }, warn: sink.warn }),
     'new',
   );
   resetPluginEnvWarnings();
-  assert.equal(pluginEnv('CREW_HUB', { env: { DSH_CREW_HUB: 'old' }, warn: sink.warn }), 'old');
-  assert.equal(pluginEnv('CREW_HUB', { env: {}, warn: sink.warn }), undefined);
+  assert.equal(pluginEnv('ADAPTER_HUB', { env: { DSH_ADAPTER_HUB: 'old' }, warn: sink.warn }), 'old');
+  assert.equal(pluginEnv('ADAPTER_HUB', { env: {}, warn: sink.warn }), undefined);
 });
 
 test('resolution is by presence, so an empty new value does NOT fall back', () => {
@@ -48,7 +48,7 @@ test('resolution is by presence, so an empty new value does NOT fall back', () =
   const sink = capture();
   // "I deliberately want no override here" must not resurrect the legacy value.
   assert.equal(
-    pluginEnv('CREW_HUB', { env: { DSHPLUGIN_CREW_HUB: '', DSH_CREW_HUB: 'stale' }, warn: sink.warn }),
+    pluginEnv('ADAPTER_HUB', { env: { DSHPLUGIN_ADAPTER_HUB: '', DSH_ADAPTER_HUB: 'stale' }, warn: sink.warn }),
     '',
   );
 });
@@ -56,13 +56,13 @@ test('resolution is by presence, so an empty new value does NOT fall back', () =
 test('a legacy variable warns exactly once per process, naming both sides', () => {
   resetPluginEnvWarnings();
   const sink = capture();
-  const env = { DSH_CREW_HUB: 'old' };
-  pluginEnv('CREW_HUB', { env, warn: sink.warn });
-  pluginEnv('CREW_HUB', { env, warn: sink.warn });
-  pluginEnv('CREW_HUB', { env, warn: sink.warn });
+  const env = { DSH_ADAPTER_HUB: 'old' };
+  pluginEnv('ADAPTER_HUB', { env, warn: sink.warn });
+  pluginEnv('ADAPTER_HUB', { env, warn: sink.warn });
+  pluginEnv('ADAPTER_HUB', { env, warn: sink.warn });
   assert.equal(sink.lines.length, 1);
-  assert.match(sink.lines[0], /DSH_CREW_HUB/);
-  assert.match(sink.lines[0], /DSHPLUGIN_CREW_HUB/);
+  assert.match(sink.lines[0], /DSH_ADAPTER_HUB/);
+  assert.match(sink.lines[0], /DSHPLUGIN_ADAPTER_HUB/);
   // The remedy must say REPLACE: adding the new name beside the old one in a
   // .env file still aborts the host, so "also set the new one" is wrong advice.
   assert.match(sink.lines[0], /REPLACE/);
@@ -71,8 +71,8 @@ test('a legacy variable warns exactly once per process, naming both sides', () =
 test('the warning never prints the value (hub URLs and paths are not for logs)', () => {
   resetPluginEnvWarnings();
   const sink = capture();
-  pluginEnv('CREW_HUB', {
-    env: { DSH_CREW_HUB: 'http://secret.internal:9999/private' },
+  pluginEnv('ADAPTER_HUB', {
+    env: { DSH_ADAPTER_HUB: 'http://secret.internal:9999/private' },
     warn: sink.warn,
   });
   assert.equal(sink.lines.length, 1);
@@ -82,7 +82,7 @@ test('the warning never prints the value (hub URLs and paths are not for logs)',
 test('a legacy variable still warns when the new name overrides it', () => {
   resetPluginEnvWarnings();
   const sink = capture();
-  pluginEnv('CREW_HUB', { env: { DSHPLUGIN_CREW_HUB: 'new', DSH_CREW_HUB: 'old' }, warn: sink.warn });
+  pluginEnv('ADAPTER_HUB', { env: { DSHPLUGIN_ADAPTER_HUB: 'new', DSH_ADAPTER_HUB: 'old' }, warn: sink.warn });
   assert.equal(sink.lines.length, 1);
   assert.match(sink.lines[0], /takes precedence/);
 });
@@ -90,6 +90,6 @@ test('a legacy variable still warns when the new name overrides it', () => {
 test('a new-only variable is silent', () => {
   resetPluginEnvWarnings();
   const sink = capture();
-  pluginEnv('CREW_HUB', { env: { DSHPLUGIN_CREW_HUB: 'new' }, warn: sink.warn });
+  pluginEnv('ADAPTER_HUB', { env: { DSHPLUGIN_ADAPTER_HUB: 'new' }, warn: sink.warn });
   assert.deepEqual(sink.lines, []);
 });

@@ -3,7 +3,7 @@
 // subscription CLIs (claude -p, codex exec, agy).
 //
 // Vision ladder (WPC11): native DeepSeek VL model deepseek-v4-flash-vision-exp
-// (direct API call, key from DEEPSEEK_API_KEY or ~/.config/dsh-crew/.env — the
+// (direct API call, key from DEEPSEEK_API_KEY or ~/.config/dsh-adapter/.env — the
 // same source the standalone dispatch uses) is preferred whenever a key is
 // available; every failure degrades to the pre-existing CLI provider chain,
 // which is kept byte-for-byte as the fallback. Image generation is untouched:
@@ -20,7 +20,7 @@ import { join, isAbsolute, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { tr, setLang } from './i18n.mjs';
 
-const CONFIG_DIR = join(homedir(), '.config', 'dsh-crew');
+const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 const CACHE_FILE = join(CONFIG_DIR, 'vision-cache.json');
 const CACHE_CAP = 200;
 
@@ -52,7 +52,7 @@ function loadDotEnv() {
   return dotEnv;
 }
 
-/** Key for the native call: env wins, then ~/.config/dsh-crew/.env (same
+/** Key for the native call: env wins, then ~/.config/dsh-adapter/.env (same
  * precedence the standalone dispatch applies). */
 function deepseekApiKey() {
   return String(process.env.DEEPSEEK_API_KEY ?? '').trim() || String(loadDotEnv().DEEPSEEK_API_KEY ?? '').trim();
@@ -250,8 +250,8 @@ async function generateViaApi(entry, prompt, outputPath, size) {
   // fail late (or bill for nothing). Image generation is opt-in per provider.
   const m = String(entry.imagegen_model ?? '').trim();
   if (!m) throw new Error(tr(
-    `自定义 provider "${entry.name ?? entry.id}" 未配置生图模型（在设置 → DSH Crew → 自定义 Provider 的"生图模型"里填写）`,
-    `Custom provider "${entry.name ?? entry.id}" has no image-gen model (fill in "Image-gen model" under Settings → DSH Crew → Custom providers)`));
+    `自定义 provider "${entry.name ?? entry.id}" 未配置生图模型（在设置 → DSH Adapter → 自定义 Provider 的"生图模型"里填写）`,
+    `Custom provider "${entry.name ?? entry.id}" has no image-gen model (fill in "Image-gen model" under Settings → DSH Adapter → Custom providers)`));
   const body = { model: m, prompt, n: 1 };
   if (size && /^\d+x\d+$/.test(size)) body.size = size;
   const data = await fetchJson(`${base}/images/generations`, { apiKey: entry.api_key, timeoutMs: 480_000, body });
@@ -547,8 +547,8 @@ export async function listVisionModels(provider, force = false, getConfig = null
 function envelope(tool, text) { return { ok: true, tool, text }; }
 
 const VISION_PROVIDER_HINT = tr(
-  `未知视觉 provider: PROVIDER（内置: ${BUILTIN_VISION.join(' / ')} / native，或在设置 → DSH Crew → 自定义 Provider 里添加）`,
-  `Unknown vision provider: PROVIDER (built-in: ${BUILTIN_VISION.join(' / ')} / native, or add one under Settings → DSH Crew → Custom providers)`);
+  `未知视觉 provider: PROVIDER（内置: ${BUILTIN_VISION.join(' / ')} / native，或在设置 → DSH Adapter → 自定义 Provider 里添加）`,
+  `Unknown vision provider: PROVIDER (built-in: ${BUILTIN_VISION.join(' / ')} / native, or add one under Settings → DSH Adapter → Custom providers)`);
 
 /**
  * Cache key for one vision answer. The leading 'v3' version tag plus the
@@ -592,7 +592,7 @@ async function describeViaCli(provider, model, custom, imagePath, question) {
  */
 export async function describeFileWithProvenance(getConfig, imagePath, question) {
   const config = getConfig();
-  const configured = config.vision_provider ?? 'claude-code';
+  const configured = config.vision_provider ?? 'codex';
   if (configured === 'off') throw new Error('vision bridge is disabled');
   const model = config.vision_model ?? 'haiku';
   const stat = statSync(imagePath);
@@ -604,7 +604,7 @@ export async function describeFileWithProvenance(getConfig, imagePath, question)
   }
   // For an explicit 'native' id the CLI degradation target is the default
   // chain entry; for built-in CLI providers it is that provider itself.
-  const cliProvider = isNativeId ? 'claude-code' : configured;
+  const cliProvider = isNativeId ? 'codex' : configured;
   const useNativeLadder = BUILTIN_VISION.includes(configured) || isNativeId;
   const cache = readCache();
 
@@ -613,8 +613,8 @@ export async function describeFileWithProvenance(getConfig, imagePath, question)
     const apiKey = deepseekApiKey();
     if (!apiKey) {
       nativeIssue = { skipped: true, reason: tr(
-        '缺少 DEEPSEEK_API_KEY（环境变量或 ~/.config/dsh-crew/.env）',
-        'no DEEPSEEK_API_KEY (env or ~/.config/dsh-crew/.env)') };
+        '缺少 DEEPSEEK_API_KEY（环境变量或 ~/.config/dsh-adapter/.env）',
+        'no DEEPSEEK_API_KEY (env or ~/.config/dsh-adapter/.env)') };
     } else {
       const key = visionCacheKey({ backend: 'native', provider: 'deepseek', model: NATIVE_VISION_MODEL, imagePath, stat, question, baseUrl: deepseekBaseUrl() });
       if (cache[key]) {
@@ -626,11 +626,11 @@ export async function describeFileWithProvenance(getConfig, imagePath, question)
         if (text === '') throw new Error('native returned an empty answer');
         cache[key] = text;
         writeCache(cache);
-        console.warn(`dsh-crew: vision answered by native ${NATIVE_VISION_MODEL} in ${Date.now() - started}ms`);
+        console.warn(`dsh-adapter: vision answered by native ${NATIVE_VISION_MODEL} in ${Date.now() - started}ms`);
         return { text, provider: `native · ${NATIVE_VISION_MODEL}`, model: NATIVE_VISION_MODEL, cached: false };
       } catch (err) {
         nativeIssue = { skipped: false, reason: String(err?.message ?? err) };
-        console.warn(`dsh-crew: native vision failed, falling back to "${cliProvider}": ${nativeIssue.reason}`);
+        console.warn(`dsh-adapter: native vision failed, falling back to "${cliProvider}": ${nativeIssue.reason}`);
       }
     }
   }
@@ -679,8 +679,8 @@ export function createMultimodalTools(getConfig) {
     },
     async execute(args) {
       const config = getConfig();
-      const provider = config.vision_provider ?? 'claude-code';
-      if (provider === 'off') throw new Error(tr('视觉桥已关闭（设置 → DSH Crew → 视觉 provider）', 'the vision bridge is disabled (Settings → DSH Crew → Vision provider)'));
+      const provider = config.vision_provider ?? 'codex';
+      if (provider === 'off') throw new Error(tr('视觉桥已关闭（设置 → DSH Adapter → 视觉 provider）', 'the vision bridge is disabled (Settings → DSH Adapter → Vision provider)'));
       const imagePath = String(args.image_path ?? '');
       if (!isAbsolute(imagePath) || !existsSync(imagePath)) throw new Error(`image_path must be an existing absolute path, got: ${imagePath}`);
       const question = typeof args.question === 'string' && args.question !== ''
@@ -715,7 +715,7 @@ export function createMultimodalTools(getConfig) {
     async execute(args) {
       const config = getConfig();
       const provider = args.provider ?? config.imagegen_provider ?? 'codex';
-      if (provider === 'off') throw new Error(tr('生图已关闭（设置 → DSH Crew → 生图 provider）', 'image generation is disabled (Settings → DSH Crew → Image-gen provider)'));
+      if (provider === 'off') throw new Error(tr('生图已关闭（设置 → DSH Adapter → 生图 provider）', 'image generation is disabled (Settings → DSH Adapter → Image-gen provider)'));
       const outputPath = String(args.output_path ?? '');
       if (!isAbsolute(outputPath)) throw new Error(`output_path must be absolute, got: ${outputPath}`);
       const prompt = String(args.prompt ?? '').trim();
@@ -723,8 +723,8 @@ export function createMultimodalTools(getConfig) {
       const custom = BUILTIN_IMAGEGEN.includes(provider) ? null : findCustomProvider(config, provider);
       if (!BUILTIN_IMAGEGEN.includes(provider) && !custom) {
         throw new Error(tr(
-          `未知生图 provider: ${provider}（内置: ${BUILTIN_IMAGEGEN.join(' / ')}，或在设置 → DSH Crew → 自定义 Provider 里添加）`,
-          `Unknown image-gen provider: ${provider} (built-in: ${BUILTIN_IMAGEGEN.join(' / ')}, or add one under Settings → DSH Crew → Custom providers)`));
+          `未知生图 provider: ${provider}（内置: ${BUILTIN_IMAGEGEN.join(' / ')}，或在设置 → DSH Adapter → 自定义 Provider 里添加）`,
+          `Unknown image-gen provider: ${provider} (built-in: ${BUILTIN_IMAGEGEN.join(' / ')}, or add one under Settings → DSH Adapter → Custom providers)`));
       }
       const saved = custom
         ? (entryType(custom) === 'cli'

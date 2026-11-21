@@ -279,7 +279,7 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
   try {
     child = spawn(profile.cli, args, {
       cwd: workspace,
-      // Origin guard: the CLI worker inherits the dispatch chain, so a crew
+      // Origin guard: the CLI worker inherits the dispatch chain, so a adapter
       // instance it starts itself continues the chain (WPC9).
       env: {
         ...process.env,

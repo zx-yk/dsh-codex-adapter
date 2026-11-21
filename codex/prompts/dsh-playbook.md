@@ -1,6 +1,6 @@
 When the user asks how to dispatch work to DSH workers — tier choice, writing a brief, parallelism, verifying results, guardrails — answer from the playbook below. Point to the relevant section rather than reciting it whole.
 
-# DSH Crew — Dispatch Playbook
+# DSH Adapter — Dispatch Playbook
 
 How to delegate work to DSH workers well. The tool descriptions carry the mechanics; this playbook is the decision layer.
 

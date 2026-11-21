@@ -17,7 +17,7 @@
 export const PLUGIN_ENV_PREFIX = 'DSHPLUGIN_';
 export const LEGACY_ENV_PREFIX = 'DSH_';
 
-const PLUGIN_LABEL = 'dsh-crew';
+const PLUGIN_LABEL = 'dsh-adapter';
 
 /** One warning per legacy variable per process, not one per lookup. */
 const warned = new Set();
@@ -38,7 +38,7 @@ export function legacyEnvName(suffix) {
 }
 
 /**
- * Read one plugin variable by its suffix (e.g. 'CREW_HUB').
+ * Read one plugin variable by its suffix (e.g. 'ADAPTER_HUB').
  *
  * Resolution is by PRESENCE, not truthiness: a new variable set to the empty
  * string is a deliberate "no override" and must not silently resurrect a stale

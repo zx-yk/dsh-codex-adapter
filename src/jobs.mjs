@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CONFIG_DIR = join(homedir(), '.config', 'dsh-crew');
+const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 const STATUS_FILE = join(CONFIG_DIR, 'status.json');
 const RUNTIME_BIN = join(ROOT, 'node_modules', '.bin', 'dsh-jsonrpc-agent');
 const CORDIS = join(ROOT, 'worker.cordis.yml');
@@ -175,7 +175,7 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
           DSH_SESSION_ROOT: join(CONFIG_DIR, 'sessions'),
           DSH_REASONING_EFFORT: effort,
           // Origin guard: the worker runtime inherits the dispatch chain, so a
-          // crew instance it starts itself continues the chain (WPC9).
+          // adapter instance it starts itself continues the chain (WPC9).
           ...(origin ? { [ORIGIN_CHAIN_ENV]: JSON.stringify(origin.chain), [ORIGIN_DEPTH_ENV]: String(origin.depth) } : {}),
         },
         requestTimeoutMs: timeoutMs,

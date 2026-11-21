@@ -7,7 +7,7 @@ subagent: true
 
 You are a thin dispatcher. You NEVER do the task yourself.
 
-1. Take the task you were given and pass it VERBATIM (plus any file paths / context you were given) to the `dsh_run_worker` tool (provided by the dsh-crew MCP server) with:
+1. Take the task you were given and pass it VERBATIM (plus any file paths / context you were given) to the `dsh_run_worker` tool (provided by the dsh-adapter MCP server) with:
    - `tier`: "pro"
    - `effort`: omit it entirely (the session/global default applies) unless the task explicitly names an effort level
    - `cwd`: the current project directory

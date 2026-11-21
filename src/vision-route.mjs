@@ -22,7 +22,7 @@ import { tr } from './i18n.mjs';
 
 const VISION_PROVIDER = 'deepseek-vision';
 const DELEGATE = 'deepseek-official';
-const ATTACH_DIR = join(homedir(), '.config', 'dsh-crew', 'attachments');
+const ATTACH_DIR = join(homedir(), '.config', 'dsh-adapter', 'attachments');
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 
@@ -112,7 +112,7 @@ export function installVisionRoute(ctx, getConfig) {
           const { text: desc, provider } = await describeFileWithProvenance(getConfig, path, tr(
             '详细描述这张图片：整体内容、布局结构、可见文字（逐字）、颜色与显著元素。',
             'Describe this image in detail: overall content, layout, any visible text (verbatim), colours and notable elements.'));
-          ctx.logger?.info?.(`dsh-crew: vision transcript for ${path} via ${provider}`);
+          ctx.logger?.info?.(`dsh-adapter: vision transcript for ${path} via ${provider}`);
           content.push({
             type: 'text',
             text: `${TRANSCRIPT_PREFIX(name)}\n${desc}\n${tr(
@@ -134,6 +134,6 @@ export function installVisionRoute(ctx, getConfig) {
     return changed ? { kind: 'enter', messages: rewritten } : decision;
   }));
 
-  ctx.logger?.info?.('dsh-crew: vision route registered (provider "deepseek-vision" + pre-step transcription)');
+  ctx.logger?.info?.('dsh-adapter: vision route registered (provider "deepseek-vision" + pre-step transcription)');
   return () => { for (const d of disposers.reverse()) { try { d(); } catch {} } };
 }

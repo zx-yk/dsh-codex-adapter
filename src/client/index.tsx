@@ -1,4 +1,4 @@
-// Browser half of dsh-crew: integrations (install/update/restore),
+// Browser half of dsh-adapter: integrations (install/update/restore),
 // global worker configuration, and the live jobs table.
 // Talks only to the plugin's own loopback routes.
 
@@ -15,17 +15,17 @@ import { reconcileGhosts, displayJobs, groupJobs, workspaceKey, basenameOf, abbr
 
 export const inject = ['slots', 'locale'];
 
-const API = '/_dsh/dsh-crew';
+const API = '/_dsh/dsh-adapter';
 
 // ---------------------------------------------------------------------------
 // Collapsible-state helpers. Integrations / global config are one-time setup
-// (dsh-crew.settings.collapse.<section>); per-workspace job groups and their
-// finished-job folds use dsh-crew.jobs.collapse.<workspace-hash> and
-// dsh-crew.settings.collapse.finished-jobs.<workspace-hash> (WPC13). When
+// (dsh-adapter.settings.collapse.<section>); per-workspace job groups and their
+// finished-job folds use dsh-adapter.jobs.collapse.<workspace-hash> and
+// dsh-adapter.settings.collapse.finished-jobs.<workspace-hash> (WPC13). When
 // localStorage is unavailable (privacy mode, sandboxed iframe, …) we degrade
 // to session-only memory. First visit defaults to expanded.
-const COLLAPSE_PREFIX = 'dsh-crew.settings.collapse.';
-const WS_COLLAPSE_PREFIX = 'dsh-crew.jobs.collapse.';
+const COLLAPSE_PREFIX = 'dsh-adapter.settings.collapse.';
+const WS_COLLAPSE_PREFIX = 'dsh-adapter.jobs.collapse.';
 const collapseSessionMemory: Record<string, boolean> = {};
 
 function readCollapsed(key: string, defaultCollapsed = false): boolean {
@@ -42,10 +42,10 @@ function persistCollapsed(key: string, collapsed: boolean): void {
 
 // Orphan ghosts (WPC10): running jobs the panel saw that later vanished from
 // an OK /jobs response without reaching a terminal state. Persisted under
-// dsh-crew.jobs.ghosts so a page reload does not erase the trace of a job
+// dsh-adapter.jobs.ghosts so a page reload does not erase the trace of a job
 // that died while nobody was looking (the WPC10 incident). Same try/catch
 // degradation as the collapse keys.
-const GHOST_STORE_KEY = 'dsh-crew.jobs.ghosts';
+const GHOST_STORE_KEY = 'dsh-adapter.jobs.ghosts';
 const ghostSessionMemory: Record<string, any> = {};
 function readGhosts(): Record<string, any> {
   try {
@@ -60,7 +60,7 @@ function writeGhosts(ghosts: Record<string, any>): void {
   catch { Object.assign(ghostSessionMemory, ghosts); }
 }
 
-/** Section open state + toggle, persisted under dsh-crew.settings.collapse.<section>. */
+/** Section open state + toggle, persisted under dsh-adapter.settings.collapse.<section>. */
 function useCollapseSection(section: string, defaultCollapsed = false): [boolean, () => void] {
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed(COLLAPSE_PREFIX + section, defaultCollapsed));
   const toggle = useCallback(() => {
@@ -71,7 +71,7 @@ function useCollapseSection(section: string, defaultCollapsed = false): [boolean
   return [collapsed, toggle];
 }
 
-/** Per-workspace job-group collapse, persisted under dsh-crew.jobs.collapse.<workspaceKey> (WPC13). */
+/** Per-workspace job-group collapse, persisted under dsh-adapter.jobs.collapse.<workspaceKey> (WPC13). */
 function useWorkspaceCollapse(wsKey: string): [boolean, () => void] {
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed(WS_COLLAPSE_PREFIX + wsKey));
   const toggle = useCallback(() => {
@@ -84,17 +84,18 @@ function useWorkspaceCollapse(wsKey: string): [boolean, () => void] {
 
 const COPY = {
   zh: {
-    label: 'DSH Crew',
-    title: 'DSH Crew',
+    label: 'DSH Adapter',
+    title: 'DSH Adapter',
     intro: '把 Claude Code / Codex 的子任务派给本实例的 DSH agent，在宿主里显示为原生子代理、进度可见。配置派发默认值、执行方式，以及接入视觉与生图能力，一键装进宿主。',
     integrations: '集成',
     collapse: '折叠', expand: '展开',
     installed: '已安装', notInstalled: '未安装', hud: 'HUD 段',
     install: '安装', update: '更新', restore: '还原',
-    confirmRestore: (name: string) => `确定从 ${name} 移除 dsh-crew 集成？（settings 会先备份）`,
+    confirmRestore: (name: string) => `确定从 ${name} 移除 dsh-adapter 集成？（settings 会先备份）`,
     globalConfig: '全局配置',
-    globalHint: '修改即时保存到 ~/.config/dsh-crew/config.json；CC / Codex 的新会话自动读取为默认值（会话内可用 /dsh-crew:config 临时覆盖）。',
+    globalHint: '修改即时保存到 ~/.config/dsh-adapter/config.json；CC / Codex 的新会话自动读取为默认值（会话内可用 /dsh-adapter:config 临时覆盖）。',
     tier: '默认档位', effort: '默认推理', mode: '执行模式', timeout: '默认超时(秒)', hubUrl: 'Hub 地址',
+    tierFlash: 'flash · 默认', tierPro: 'pro · 备选',
     tierPolicy: '档位策略', escalate: '失败升档',
     tierPolicyDesc: { auto: 'auto · orchestrator 自选', 'flash-only': '只用 flash', 'pro-only': '只用 pro' },
     escalateHint: 'flash 失败自动用 pro 重试一次',
@@ -108,7 +109,7 @@ const COPY = {
     providerType: '接入方式', typeApi: 'API · 兼容 OpenAI 接口', typeCli: 'CLI · 本地命令',
     baseUrl: 'Base URL', apiKey: 'API Key', imagegenModel: '生图模型（留空=不提供生图）',
     visionCmd: '视觉命令（可选）', imagegenCmd: '生图命令（可选）',
-    apiFormHint: '走 OpenAI 兼容接口：视觉调 {base}/chat/completions（图片以 base64 内联），生图调 {base}/images/generations。Key 保存在本机 ~/.config/dsh-crew/config.json，不会外发到第三方。',
+    apiFormHint: '走 OpenAI 兼容接口：视觉调 {base}/chat/completions（图片以 base64 内联），生图调 {base}/images/generations。Key 保存在本机 ~/.config/dsh-adapter/config.json，不会外发到第三方。',
     cliFormHint: '命令经 bash 执行，占位符会被安全引用后代入。视觉: {image} {question} {model}，stdout 即答案；生图: {prompt} {output} {size}，命令须把图片写到 {output}。两条命令至少填一条。',
     saveProvider: '保存', cancel: '取消', edit: '编辑', del: '删除',
     testProvider: '连通测试', testing: '测试中…',
@@ -144,7 +145,7 @@ const COPY = {
     procKillDone: '已向失联进程发送终止信号',
     procKillAlreadyGone: '进程已不存在（可能已自行退出）',
     procAliveBadgeTip: (pid: number) => `任务已失联，但其工作进程仍在运行（pid ${pid}）：很可能是派活宿主崩溃后留下的孤儿进程`,
-    procKillTip: (pid: number) => `杀死 pid ${pid}：先读取命令行校验确为 dsh-crew 工作进程（DSH 运行时 / agy / grok），再 SIGTERM，约 3 秒后仍存活则 SIGKILL`,
+    procKillTip: (pid: number) => `杀死 pid ${pid}：先读取命令行校验确为 dsh-adapter 工作进程（DSH 运行时 / agy / grok），再 SIGTERM，约 3 秒后仍存活则 SIGKILL`,
     finishedJobs: '已结束',
     noCwdGroup: '（未指定工作区）',
     lockBadgeTip: (h: any) => `「${h?.cwd ?? '此工作区'}」正被运行中任务持锁（job ${h?.jobId} · backend ${h?.backend} · 开始于 ${h?.startedAt}）：对该 cwd 的再次派发会被拒绝，除非传 allow_concurrent_cwd: true。`,
@@ -164,29 +165,30 @@ const COPY = {
         restore: '删除 ~/.codex/ 下的 ds-flash / ds-pro 角色与 dsh 命令文件（角色文件先备份）',
       },
       agy: {
-        install: '把 dsh-crew MCP server 注册进 ~/.gemini/config/mcp_config.json，并将 ds-flash / ds-pro 代理与 dsh-config / dsh-status skills 复制到 ~/.gemini/config/agents 与 skills（修改前自动备份）',
+        install: '把 dsh-adapter MCP server 注册进 ~/.gemini/config/mcp_config.json，并将 ds-flash / ds-pro 代理与 dsh-config / dsh-status skills 复制到 ~/.gemini/config/agents 与 skills（修改前自动备份）',
         update: '重新覆盖 MCP 配置、代理与 skills（插件路径或配置变更后用）；原文件先备份',
-        restore: '从 ~/.gemini/config 移除 dsh-crew 的 mcp_config.json 条目、ds-flash / ds-pro 代理与 dsh-config / dsh-status skills（修改前备份）',
+        restore: '从 ~/.gemini/config 移除 dsh-adapter 的 mcp_config.json 条目、ds-flash / ds-pro 代理与 dsh-config / dsh-status skills（修改前备份）',
       },
       grok: {
-        install: '把 dsh-crew MCP server 段写入 ~/.grok/config.toml，并将 ds-flash / ds-pro 代理与 dsh-config / dsh-status 命令复制到 ~/.grok/agents 与 commands（修改前自动备份）。提示：grok 出于安全设计，在未信任的项目目录里不会启动仓库级 MCP server —— 全局安装不受影响，但在未信任目录里用 grok mcp doctor 检查时会看到 "folder untrusted"，换个目录或加 --trust 即可。',
+        install: '把 dsh-adapter MCP server 段写入 ~/.grok/config.toml，并将 ds-flash / ds-pro 代理与 dsh-config / dsh-status 命令复制到 ~/.grok/agents 与 commands（修改前自动备份）。提示：grok 出于安全设计，在未信任的项目目录里不会启动仓库级 MCP server —— 全局安装不受影响，但在未信任目录里用 grok mcp doctor 检查时会看到 "folder untrusted"，换个目录或加 --trust 即可。',
         update: '重新覆盖 config.toml 的 MCP 段、代理与命令（插件路径或配置变更后用）；原文件先备份',
-        restore: '从 ~/.grok 移除 dsh-crew 的 config.toml 段、ds-flash / ds-pro 代理与 dsh-config / dsh-status 命令（修改前备份）',
+        restore: '从 ~/.grok 移除 dsh-adapter 的 config.toml 段、ds-flash / ds-pro 代理与 dsh-config / dsh-status 命令（修改前备份）',
       },
     },
   },
   en: {
-    label: 'DSH Crew',
-    title: 'DSH Crew',
+    label: 'DSH Adapter',
+    title: 'DSH Adapter',
     intro: 'Dispatch Claude Code / Codex subtasks to DSH agents within this instance, displayed as native subagents in the host with live progress. Configure dispatch defaults, execution mode, and vision/image generation (via subscription CLI or your own OpenAI API), then one-click install into the host.',
     integrations: 'Integrations',
     collapse: 'Collapse', expand: 'Expand',
     installed: 'installed', notInstalled: 'not installed', hud: 'HUD segment',
     install: 'Install', update: 'Update', restore: 'Restore',
-    confirmRestore: (name: string) => `Remove the dsh-crew integration from ${name}? (settings are backed up first)`,
+    confirmRestore: (name: string) => `Remove the dsh-adapter integration from ${name}? (settings are backed up first)`,
     globalConfig: 'Global configuration',
-    globalHint: 'Changes save instantly to ~/.config/dsh-crew/config.json; new CC / Codex sessions pick them up as defaults (override per session with /dsh-crew:config).',
+    globalHint: 'Changes save instantly to ~/.config/dsh-adapter/config.json; new CC / Codex sessions pick them up as defaults (override per session with /dsh-adapter:config).',
     tier: 'Default tier', effort: 'Default effort', mode: 'Mode', timeout: 'Timeout (s)', hubUrl: 'Hub URL',
+    tierFlash: 'flash · default', tierPro: 'pro · alternate',
     tierPolicy: 'Tier policy', escalate: 'Escalate on failure',
     tierPolicyDesc: { auto: 'auto · orchestrator picks', 'flash-only': 'flash only', 'pro-only': 'pro only' },
     escalateHint: 'retry a failed flash run once on pro',
@@ -200,7 +202,7 @@ const COPY = {
     providerType: 'Connection', typeApi: 'API · OpenAI-compatible', typeCli: 'CLI · local command',
     baseUrl: 'Base URL', apiKey: 'API key', imagegenModel: 'Image-gen model (empty = no image generation)',
     visionCmd: 'Vision command (optional)', imagegenCmd: 'Image-gen command (optional)',
-    apiFormHint: 'OpenAI-compatible: vision calls {base}/chat/completions (image inlined as base64), image-gen calls {base}/images/generations. The key is stored locally in ~/.config/dsh-crew/config.json and never sent to third parties.',
+    apiFormHint: 'OpenAI-compatible: vision calls {base}/chat/completions (image inlined as base64), image-gen calls {base}/images/generations. The key is stored locally in ~/.config/dsh-adapter/config.json and never sent to third parties.',
     cliFormHint: 'Commands run via bash with shell-quoted placeholders. Vision: {image} {question} {model}, stdout is the answer; image-gen: {prompt} {output} {size}, the command must write the image to {output}. Fill in at least one command.',
     saveProvider: 'Save', cancel: 'Cancel', edit: 'Edit', del: 'Delete',
     testProvider: 'Test', testing: 'Testing…',
@@ -256,14 +258,14 @@ const COPY = {
         restore: 'Delete ds-flash / ds-pro roles and dsh prompts from ~/.codex/ (roles backed up first)',
       },
       agy: {
-        install: 'Register the dsh-crew MCP server in ~/.gemini/config/mcp_config.json and copy ds-flash / ds-pro agents plus dsh-config / dsh-status skills into ~/.gemini/config/agents and skills (backed up first)',
+        install: 'Register the dsh-adapter MCP server in ~/.gemini/config/mcp_config.json and copy ds-flash / ds-pro agents plus dsh-config / dsh-status skills into ~/.gemini/config/agents and skills (backed up first)',
         update: 'Re-write the MCP entry, agents and skills (after path/config changes); originals backed up',
-        restore: 'Remove the dsh-crew mcp_config.json entry, ds-flash / ds-pro agents and dsh-config / dsh-status skills from ~/.gemini/config (backed up first)',
+        restore: 'Remove the dsh-adapter mcp_config.json entry, ds-flash / ds-pro agents and dsh-config / dsh-status skills from ~/.gemini/config (backed up first)',
       },
       grok: {
-        install: 'Write the dsh-crew MCP server section into ~/.grok/config.toml and copy ds-flash / ds-pro agents plus dsh-config / dsh-status commands into ~/.grok/agents and commands (backed up first). Note: by security design grok does not start repo-level MCP servers in untrusted project directories — a global install is unaffected, but grok mcp doctor reports "folder untrusted" in an untrusted directory; change directory or pass --trust.',
+        install: 'Write the dsh-adapter MCP server section into ~/.grok/config.toml and copy ds-flash / ds-pro agents plus dsh-config / dsh-status commands into ~/.grok/agents and commands (backed up first). Note: by security design grok does not start repo-level MCP servers in untrusted project directories — a global install is unaffected, but grok mcp doctor reports "folder untrusted" in an untrusted directory; change directory or pass --trust.',
         update: 'Re-write the config.toml MCP section, agents and commands (after path/config changes); originals backed up',
-        restore: 'Remove the dsh-crew config.toml section, ds-flash / ds-pro agents and dsh-config / dsh-status commands from ~/.grok (backed up first)',
+        restore: 'Remove the dsh-adapter config.toml section, ds-flash / ds-pro agents and dsh-config / dsh-status commands from ~/.grok (backed up first)',
       },
     },
   },
@@ -792,7 +794,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         {block(copy.cardDispatch, (<>
           <label style={S.field}><span style={S.fieldLabel}>{copy.tier}</span>
             <CustomSelect value={config.default_tier} onChange={(v) => field('default_tier', v)}
-              options={[{ value: 'flash' }, { value: 'pro' }]} /></label>
+              options={[{ value: 'flash', label: copy.tierFlash }, { value: 'pro', label: copy.tierPro }]} /></label>
           <label style={S.field}><span style={S.fieldLabel}>{copy.effort}</span>
             <CustomSelect value={config.default_effort} onChange={(v) => field('default_effort', v)}
               options={[{ value: 'off' }, { value: 'high' }, { value: 'max' }]} /></label>
@@ -1099,7 +1101,7 @@ export function apply(ctx: any): void {
       return ctx.slots.register(
         {
           name: 'settings.section',
-          id: 'dsh-crew',
+          id: 'dsh-adapter',
           order: 65,
           label: () => {
             const base = COPY[ctx.locale.getLocale().active === 'zh' ? 'zh' : 'en'].label;

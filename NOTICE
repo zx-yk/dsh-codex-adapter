@@ -1,7 +1,7 @@
 dsh-codex-adapter
 =================
 
-This project is an independent derivative of dsh-crew.
+This project is an independent derivative of dsh-adapter.
 
   Upstream project:  https://github.com/ZSeven-W/dsh-crew
   Starting version:  0.1.0-rc.15 (commit b00cc6d)
@@ -21,7 +21,7 @@ requirement and makes the provenance of the code explicit.
 Trademarks and endorsement
 --------------------------
 The MIT License grants copyright and patent permissions only; it grants no
-trademark rights. The names "dsh-crew", "DSH Crew" and "ZSeven-W" are used here
+trademark rights. The names "dsh-adapter", "DSH Adapter" and "ZSeven-W" are used here
 solely to describe the origin of this code (factual attribution). This project
 is not affiliated with, endorsed by, or sponsored by the upstream authors, and
 no upstream logo or branding is claimed as a mark of this project.

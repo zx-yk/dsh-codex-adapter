@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./docs/images/dsh-crew-logo.png" alt="DSH Crew" width="120" />
+  <img src="./docs/images/dsh-adapter-logo.png" alt="DSH Adapter" width="120" />
 </p>
 
-<h1 align="center">DSH Crew</h1>
+<h1 align="center">DSH Adapter</h1>
 
 <p align="center">
   <strong>Ein <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>-Plugin: Verteilen Sie Arbeit von Claude Code / Codex / Antigravity / Grok aus an DSH-Agenten, ohne auf die native Subagent-UI des Hosts zu verzichten.</strong><br />
@@ -24,13 +24,13 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-overview.png" alt="DSH Crew — Einstellungsseite" width="100%" />
+  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — Einstellungsseite" width="100%" />
 </p>
-<p align="center"><sub>Die Einstellungsseite von DSH Crew — Host-Integrationen, Dispatch-Richtlinie, Ausführung und die multimodale Brücke</sub></p>
+<p align="center"><sub>Die Einstellungsseite von DSH Adapter — Host-Integrationen, Dispatch-Richtlinie, Ausführung und die multimodale Brücke</sub></p>
 
-## Warum DSH Crew
+## Warum DSH Adapter
 
-DSH Crew ist ein Plugin für [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) — ein Open-Source-Agent-Harness. Es macht DSH-Agenten aus Claude Code, Codex, Antigravity und Grok heraus dispatchbar: Der Orchestrator behält sein eigenes Modell, die Arbeit läuft auf einem echten DSH-Agenten mit den Tools, der Sandbox, den Presets und dem Sitzungsverlauf dieses Harness, und der Host zeigt diesen weiterhin als nativen Subagenten mit Live-Fortschritt an.
+DSH Adapter ist ein Plugin für [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) — ein Open-Source-Agent-Harness. Es macht DSH-Agenten aus Claude Code, Codex, Antigravity und Grok heraus dispatchbar: Der Orchestrator behält sein eigenes Modell, die Arbeit läuft auf einem echten DSH-Agenten mit den Tools, der Sandbox, den Presets und dem Sitzungsverlauf dieses Harness, und der Host zeigt diesen weiterhin als nativen Subagenten mit Live-Fortschritt an.
 
 Was die Arbeit ausführt, ist ein DSH-Agent, kein bloßer Modellaufruf. Tiers (`flash` / `pro`) bestimmen, wie viel Fähigkeit dieser Agent aus dem konfigurierten Roster des Harness erhält — derzeit DeepSeek V4 Flash und V4 Pro —, sodass ein Modellwechsel in DSH hier keine Änderung erfordert.
 
@@ -79,7 +79,7 @@ Jeder Dispatch wird geprüft, bevor irgendetwas gestartet wird. Worker→Worker-
 
 ### 📋 Jobs-Board
 
-Das DSH-Crew-Panel dient zugleich als Jobs-Board: Jeder Worker-Job — laufend oder abgeschlossen — wird mit Tier, Effort, Live-Fortschritt und Tokens aufgelistet, gehaltene Workspaces zeigen ihre Halter, und ein Job, der mitten im Flug verschwindet (z. B. ein Hub-Neustart), erscheint als verwaister Geist, statt stillschweigend zu verschwinden.
+Das DSH-Adapter-Panel dient zugleich als Jobs-Board: Jeder Worker-Job — laufend oder abgeschlossen — wird mit Tier, Effort, Live-Fortschritt und Tokens aufgelistet, gehaltene Workspaces zeigen ihre Halter, und ein Job, der mitten im Flug verschwindet (z. B. ein Hub-Neustart), erscheint als verwaister Geist, statt stillschweigend zu verschwinden.
 
 </td>
 </tr>
@@ -118,14 +118,14 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Dispatch lässt sich breit auffächern. Unten übersetzen achtzehn Worker dieses README parallel: Der Host zählt sie als eigene Subagenten, während das Harness sie als echte Sessions ausführt.
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
 </p>
-<p align="center"><sub>Claude Code sieht dsh-crew-Worker als native Subagenten; das Statusline-Segment zeigt laufende Tiers, verstrichene Zeit und Tokens.</sub></p>
+<p align="center"><sub>Claude Code sieht dsh-adapter-Worker als native Subagenten; das Statusline-Segment zeigt laufende Tiers, verstrichene Zeit und Tokens.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-crew-jobs.png" alt="DSH Crew" width="100%" />
+  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
 </p>
-<p align="center"><sub>Das DSH-Crew-Panel zeigt denselben Lauf von der Harness-Seite: welcher Host welchen Job gestartet hat, Tier und Effort, Fortschritt und Tokenverbrauch.</sub></p>
+<p align="center"><sub>Das DSH-Adapter-Panel zeigt denselben Lauf von der Harness-Seite: welcher Host welchen Job gestartet hat, Tier und Effort, Fortschritt und Tokenverbrauch.</sub></p>
 
 <p align="center"><sub>Das Panel ist zugleich das Jobs-Board: laufende und abgeschlossene Jobs bleiben mit Tier, Fortschritt und Tokens aufgelistet, gehaltene Workspaces nennen ihre Halter, und ein Job, der mitten im Flug verschwindet (ein Hub-Neustart), erscheint als verwaister Geist, statt stillschweigend zu verschwinden.</sub></p>
 
@@ -141,7 +141,7 @@ dsh web
 Oder für lokale Entwicklung direkt aus dem Quellbaum:
 
 ```bash
-dsh plugin --profile web add link:/path/to/dsh-crew
+dsh plugin --profile web add link:/path/to/dsh-adapter
 dsh web
 ```
 
@@ -151,7 +151,7 @@ Das `link:`-Protokoll verlinkt die Profilabhängigkeit auf dieses Repository, so
 
 Im Hub-Modus — die Installation oben — laufen Worker innerhalb der DSH-Instanz und nutzen die DeepSeek-Zugangsdaten, mit denen sie bereits konfiguriert ist. Mehr ist nicht zu konfigurieren.
 
-Nur das Standalone-Fallback braucht einen eigenen Key: Dispatch von einem Host ohne laufende DSH-Instanz startet eine Worker-Runtime als separaten Prozess. Hole einen API-Key auf [platform.deepseek.com](https://platform.deepseek.com) und schreibe ihn in `~/.config/dsh-crew/.env`:
+Nur das Standalone-Fallback braucht einen eigenen Key: Dispatch von einem Host ohne laufende DSH-Instanz startet eine Worker-Runtime als separaten Prozess. Hole einen API-Key auf [platform.deepseek.com](https://platform.deepseek.com) und schreibe ihn in `~/.config/dsh-adapter/.env`:
 
 ```
 DEEPSEEK_API_KEY=sk-...
@@ -165,7 +165,7 @@ node scripts/smoke.mjs
 
 Der Smoke Test schickt einen günstigen Job über den verfügbaren Pfad — den Hub, wenn eine DSH-Instanz läuft, sonst standalone — und gibt aus, welcher davon verwendet wurde. Nach etwa zehn Sekunden sollte `smoke test passed — configuration OK` erscheinen. Bei einem Fehler wird der Grund ausgegeben, bezogen auf den getesteten Pfad.
 
-Öffne danach Einstellungen → DSH Crew und installiere die Host-Integrationen — Claude Code, Codex, Antigravity, Grok — mit einem Klick, oder steuere denselben Installer über die Kommandozeile:
+Öffne danach Einstellungen → DSH Adapter und installiere die Host-Integrationen — Claude Code, Codex, Antigravity, Grok — mit einem Klick, oder steuere denselben Installer über die Kommandozeile:
 
 ```bash
 node src/install/cli.mjs claude   # Claude Code plugin: marketplace + permissions + HUD segment
@@ -192,7 +192,7 @@ node src/install/cli.mjs uninstall-claude
 
 Ein-Klick-Installation (eine Option wählen):
 
-- **DSH-Einstellungsseite** (wenn der Hub-Modus installiert ist): Settings → DSH Crew → „Install to Claude Code"
+- **DSH-Einstellungsseite** (wenn der Hub-Modus installiert ist): Settings → DSH Adapter → „Install to Claude Code"
 - **Kommandozeile**: `node src/install/cli.mjs all`
 
 Beide bewirken dasselbe: lokalen Marketplace registrieren (übergeordnetes Verzeichnis `dsh-plugins/` als Marketplace-Root) + `claude plugin install` + MCP-Tool-Berechtigungs-Allowlist + Konfiguration des claude-hud-Worker-Status-Segments (automatisches Backup von settings.json vor Änderungen, idempotent). **Starten Sie die Sitzung nach der Installation neu, damit die Änderungen wirksam werden.**
@@ -204,7 +204,7 @@ Beide bewirken dasselbe: lokalen Marketplace registrieren (übergeordnetes Verze
 - **HUD-Statuszeilen-Segment**: `⚙dsh 1▶pro 2m14s 21.7k/606 ✓3` (aktueller Tier / verstrichene Zeit / Token-Verbrauch / Abschlusszähler)
   - Für die lokale Entwicklung können `statusline/statusline.sh` oder `statusline/worker-segment.sh` unabhängig integriert werden
 - **Langlaufende Aufgaben**: CC hat Timeout-Limits für MCP-Aufrufe (`MCP_TOOL_TIMEOUT` anpassbar); bei langen Aufgaben kann der Orchestrator `dsh_spawn_worker` + `dsh_worker_result(wait_seconds)`-Polling verwenden
-- **Lokale Entwicklung und Debugging**: `claude --plugin-dir /path/to/dsh-crew` zum temporären Laden
+- **Lokale Entwicklung und Debugging**: `claude --plugin-dir /path/to/dsh-adapter` zum temporären Laden
 
 
 ### Sitzungsbefehle
@@ -213,11 +213,11 @@ Sie überschreiben die globalen Vorgaben nur für die aktuelle Sitzung und werde
 
 | Befehl | Wirkung |
 |---|---|
-| `/dsh-crew:config` | Vorgaben der Sitzung anzeigen oder setzen: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<Sekunden>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
+| `/dsh-adapter:config` | Vorgaben der Sitzung anzeigen oder setzen: `tier=flash\|pro`, `effort=off\|high\|max`, `mode=auto\|hub\|standalone`, `timeout=<Sekunden>`, `policy=auto\|flash-only\|pro-only`, `escalate=true\|false`, `origin_depth_limit=<1-32>`, `preset_flash/preset_pro=<preset id|default>`, `reset` |
 
-| `/dsh-crew:on` · `/dsh-crew:off` | Dispatch für diese Sitzung ein- oder ausschalten (aus ist ein harter Schalter: das Tool verweigert) |
-| `/dsh-crew:status` | Live-Status der Worker-Jobs: Tier, Fortschritt, Tokens, aktuelles Tool |
-| `/dsh-crew:playbook` | Dispatch-Best-Practices: die Wahl zwischen flash und pro, eigenständige Briefings, Parallelität, Verifizieren von Ergebnissen, Leitplanken |
+| `/dsh-adapter:on` · `/dsh-adapter:off` | Dispatch für diese Sitzung ein- oder ausschalten (aus ist ein harter Schalter: das Tool verweigert) |
+| `/dsh-adapter:status` | Live-Status der Worker-Jobs: Tier, Fortschritt, Tokens, aktuelles Tool |
+| `/dsh-adapter:playbook` | Dispatch-Best-Practices: die Wahl zwischen flash und pro, eigenständige Briefings, Parallelität, Verifizieren von Ergebnissen, Leitplanken |
 
 ## Codex
 
@@ -268,7 +268,7 @@ Für Codex werden drei Prompts installiert:
 node src/install/cli.mjs agy
 ```
 
-Registriert den dsh-crew-MCP-Server in `~/.gemini/config/mcp_config.json` und installiert die `ds-flash`- / `ds-pro`-Agenten sowie die Skills `dsh-config`, `dsh-status` und `dsh-playbook` nach `~/.gemini/config/` (alle Dateien werden zuvor gesichert). Starten Sie die Sitzung nach der Installation neu.
+Registriert den dsh-adapter-MCP-Server in `~/.gemini/config/mcp_config.json` und installiert die `ds-flash`- / `ds-pro`-Agenten sowie die Skills `dsh-config`, `dsh-status` und `dsh-playbook` nach `~/.gemini/config/` (alle Dateien werden zuvor gesichert). Starten Sie die Sitzung nach der Installation neu.
 
 ### Verwendung
 
@@ -297,7 +297,7 @@ Deinstallation: `node src/install/cli.mjs uninstall-agy`
 node src/install/cli.mjs grok
 ```
 
-Schreibt den Abschnitt `[mcp_servers.dsh-crew]` in `~/.grok/config.toml` und installiert die `ds-flash`- / `ds-pro`-Agenten sowie die Befehle `/dsh-config`, `/dsh-status` und `/dsh-playbook` nach `~/.grok/` (alle Dateien werden zuvor gesichert).
+Schreibt den Abschnitt `[mcp_servers.dsh-adapter]` in `~/.grok/config.toml` und installiert die `ds-flash`- / `ds-pro`-Agenten sowie die Befehle `/dsh-config`, `/dsh-status` und `/dsh-playbook` nach `~/.grok/` (alle Dateien werden zuvor gesichert).
 
 ### Verwendung
 
@@ -329,7 +329,7 @@ Deinstallation: `node src/install/cli.mjs uninstall-grok`
 | `dsh_worker_cancel` | Bricht den angegebenen Job ab und beendet seinen Runtime-Prozess |
 | `dsh_worker_config` | Sitzungsvorgaben lesen/setzen (Tier, Effort, Modus, Timeout, Richtlinie, Eskalation) und `worker_profiles` auflisten |
 
-Der Fortschritt wird gleichzeitig nach `~/.config/dsh-crew/status.d/` gespiegelt (eine Shard-Datei pro Writer, lesbar für Statusline / externes Monitoring).
+Der Fortschritt wird gleichzeitig nach `~/.config/dsh-adapter/status.d/` gespiegelt (eine Shard-Datei pro Writer, lesbar für Statusline / externes Monitoring).
 
 ## Dispatch-Leitplanken
 
@@ -340,7 +340,7 @@ Jeder Dispatch wird geprüft, bevor irgendetwas gestartet wird — Ablehnungen s
 
 ## Dispatch-Playbook
 
-Wie man *gut* dispatcht — flash vs. pro, eigenständige Briefings, sichere Parallelität, Verifizieren von Ergebnissen und die Leitplanken oben — ist als Playbook pro Host gebündelt: `/dsh-crew:playbook` (Claude-Code-Skill), `/dsh-playbook` (Codex-Prompt, Antigravity-Skill, Grok-Befehl).
+Wie man *gut* dispatcht — flash vs. pro, eigenständige Briefings, sichere Parallelität, Verifizieren von Ergebnissen und die Leitplanken oben — ist als Playbook pro Host gebündelt: `/dsh-adapter:playbook` (Claude-Code-Skill), `/dsh-playbook` (Codex-Prompt, Antigravity-Skill, Grok-Befehl).
 
 ## Explizite CLI-Backends
 
@@ -350,7 +350,7 @@ Wie man *gut* dispatcht — flash vs. pro, eigenständige Briefings, sichere Par
 
 **DeepSeek ist ein reines Textmodell** und unterstützt weder Bildeingabe noch -generierung. Dieses Plugin bezieht diese Fähigkeiten extern über MCP-Tools:
 
-**Native Vision zuerst**: Wenn der Vision-Provider eine eingebaute CLI ist (oder explizit `native`), versucht `describe_image` zuerst DeepSeeks eigenes VL-Modell `deepseek-v4-flash-vision-exp` (direkter API-Aufruf; Key aus `DEEPSEEK_API_KEY` oder `~/.config/dsh-crew/.env`). Jeder Fehler fällt sauber auf die CLI-Provider-Kette unten zurück, die als Fallback erhalten bleibt. Die Bildgenerierung bleibt unberührt — das native Modell schaut sich Bilder immer nur an.
+**Native Vision zuerst**: Wenn der Vision-Provider eine eingebaute CLI ist (oder explizit `native`), versucht `describe_image` zuerst DeepSeeks eigenes VL-Modell `deepseek-v4-flash-vision-exp` (direkter API-Aufruf; Key aus `DEEPSEEK_API_KEY` oder `~/.config/dsh-adapter/.env`). Jeder Fehler fällt sauber auf die CLI-Provider-Kette unten zurück, die als Fallback erhalten bleibt. Die Bildgenerierung bleibt unberührt — das native Modell schaut sich Bilder immer nur an.
 
 | Tool | Beschreibung |
 |---|---|
@@ -361,7 +361,7 @@ Wie man *gut* dispatcht — flash vs. pro, eigenständige Briefings, sichere Par
 
 ### Konfiguration
 
-In der **DSH-Einstellungsseite → DSH Crew → Multimodal** (oder bearbeiten Sie direkt `~/.config/dsh-crew/config.json`):
+In der **DSH-Einstellungsseite → DSH Adapter → Multimodal** (oder bearbeiten Sie direkt `~/.config/dsh-adapter/config.json`):
 
 **Vision-Provider** (Bildbetrachtung):
 
@@ -405,15 +405,15 @@ Zwei Integrationsmethoden:
 
 ## Hub-Modus
 
-Dieses Paket ist auch ein gültiges DSH-Bundle (`dsh.bundle` + `cordis.patch.yml`). Nach der Installation in ein DSH-Web-Profil mit `dsh plugin add dsh-crew`:
+Dieses Paket ist auch ein gültiges DSH-Bundle (`dsh.bundle` + `cordis.patch.yml`). Nach der Installation in ein DSH-Web-Profil mit `dsh plugin add dsh-adapter`:
 
 - **Worker-Sitzungen werden First-Class-Bürger**: laufen als First-Class-Sitzungen im DSH-Host (`agents.create` + Modell-/Effort-Wasserfall pro Sitzung + Standard-Preset), erscheinen in der Sitzungsliste der Web-UI und können jederzeit geöffnet werden, um die vollständige Ausführung einzusehen
 - **Nach Arbeitsverzeichnis organisieren**: Worker-Sitzungen nach cwd in der Web-UI verwalten
 - **Loopback-API**:
-  - `POST/GET /_dsh/dsh-crew/jobs`: Tasks starten, auflisten, Ergebnisse per Long-Poll abrufen, abbrechen
-  - `GET /_dsh/dsh-crew/ping`: Health-Check (der MCP-Shim nutzt dies, um zu erkennen, ob der Hub läuft)
-  - `POST /_dsh/dsh-crew/install`: Ein-Klick-Installation der Host-Integrationen — Claude Code / Codex / Antigravity / Grok (Backend von `src/install/`)
-- **Auto-Erkennung**: Der MCP-Shim der Hosts erkennt den Hub automatisch (Env-Var `DSHPLUGIN_CREW_HUB`, Standard `http://127.0.0.1:3080`)
+  - `POST/GET /_dsh/dsh-adapter/jobs`: Tasks starten, auflisten, Ergebnisse per Long-Poll abrufen, abbrechen
+  - `GET /_dsh/dsh-adapter/ping`: Health-Check (der MCP-Shim nutzt dies, um zu erkennen, ob der Hub läuft)
+  - `POST /_dsh/dsh-adapter/install`: Ein-Klick-Installation der Host-Integrationen — Claude Code / Codex / Antigravity / Grok (Backend von `src/install/`)
+- **Auto-Erkennung**: Der MCP-Shim der Hosts erkennt den Hub automatisch (Env-Var `DSHPLUGIN_ADAPTER_HUB`, Standard `http://127.0.0.1:3080`)
   - DSH Web läuft → Jobs wechseln in den Hub-Modus (`mode: "hub"`)
   - Läuft nicht → Fallback auf die Standalone-Runtime
 
@@ -437,7 +437,7 @@ Dieses Paket ist auch ein gültiges DSH-Bundle (`dsh.bundle` + `cordis.patch.yml
 
 ### DSH Web läuft → Hub-Modus automatisch aktiviert
 
-- **Aktueller Stand**: Ist `dsh plugin add dsh-crew` in ein DSH-Web-Profil installiert, laufen Jobs als First-Class-Sitzungen im Host und erscheinen in der Sitzungsliste der Web-UI
+- **Aktueller Stand**: Ist `dsh plugin add dsh-adapter` in ein DSH-Web-Profil installiert, laufen Jobs als First-Class-Sitzungen im Host und erscheinen in der Sitzungsliste der Web-UI
 - **Empfehlung**: Bei lokalen Entwicklungsiterationen wird empfohlen, den Hub-Modus zu aktivieren; der Worker-Fortschritt lässt sich vollständig in der Web-UI beobachten; für maschinenübergreifende Zusammenarbeit oder Umgebungen ohne Web-UI den Shell-Ansatz des dispatchierenden Hosts verwenden
 
 ### Bekannte Punkte

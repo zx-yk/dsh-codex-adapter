@@ -1,12 +1,12 @@
 // Client for the in-host workers-hub jobs API. When a DSH web instance with the
-// dsh-crew bundle is running, jobs run inside it (sessions visible in the
+// dsh-adapter bundle is running, jobs run inside it (sessions visible in the
 // Web UI); otherwise the MCP server falls back to standalone runtimes.
 
 import { readGlobalConfig } from './install/install.mjs';
 import { pluginEnv } from './plugin-env.mjs';
 
-const BASE = (pluginEnv('CREW_HUB') ?? readGlobalConfig().hub_url).replace(/\/$/, '');
-const API = `${BASE}/_dsh/dsh-crew`;
+const BASE = (pluginEnv('ADAPTER_HUB') ?? readGlobalConfig().hub_url).replace(/\/$/, '');
+const API = `${BASE}/_dsh/dsh-adapter`;
 
 let lastProbe = { at: 0, ok: false };
 
@@ -15,7 +15,7 @@ export async function hubAvailable() {
   try {
     const res = await fetch(`${API}/ping`, { signal: AbortSignal.timeout(800) });
     const body = await res.json();
-    lastProbe = { at: Date.now(), ok: res.ok && body?.service === 'dsh-crew-hub' };
+    lastProbe = { at: Date.now(), ok: res.ok && body?.service === 'dsh-adapter-hub' };
   } catch {
     lastProbe = { at: Date.now(), ok: false };
   }
