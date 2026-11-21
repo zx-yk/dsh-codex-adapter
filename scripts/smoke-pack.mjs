@@ -15,7 +15,7 @@
 // REQUIRED peerDependencies. npm 7+ auto-installs peers, and the pinned
 // 0.1.0-rc.6 versions conflict with the 0.1.0-rc.8 transitive resolution
 // inside dsh-agent-spine-demo -> dsh-tools -> dsh-agent, so a plain
-// \`npm i @zx-yk/dsh-codex-adapter\` died with ERESOLVE. rc.3 first marked every
+// \`npm i @zoraxylia/dsh-codex-adapter\` died with ERESOLVE. rc.3 first marked every
 // @deepseek-ai/* peer optional - and still failed: npm also auto-places
 // optional peers (peerOptional) when they fit, and the exact rc.6 pins
 // ERESOLVE against the rc.8 tree (dsh-llm rc.6 vs dsh-session rc.8).
@@ -39,7 +39,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PKG_NAME = '@zx-yk/dsh-codex-adapter';
+const PKG_NAME = '@zoraxylia/dsh-codex-adapter';
 const EXPECTED_TOOLS = [
   'dsh_run_worker',
   'dsh_worker_config',

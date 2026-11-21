@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; Versão atual do plugin: <code>0.1.0-rc.11</code> &middot; Testado com DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Versão atual do plugin: <code>0.1.0-rc.11</code> &middot; Testado com DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ O despacho se espalha. Abaixo, dezoito workers traduzem este README em paralelo:
 Instalar do npm em um perfil do DSH:
 
 ```bash
-dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
+dsh plugin --profile web add @zoraxylia/dsh-codex-adapter@latest
 dsh web
 ```
 

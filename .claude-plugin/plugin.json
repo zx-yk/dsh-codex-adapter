@@ -1,8 +1,8 @@
 {
   "name": "dsh-crew",
-  "version": "0.1.0-rc.15",
+  "version": "0.1.0",
   "description": "Dispatch subtasks to DeepSeek Harness (DSH) agents as native subagents with live progress",
   "author": {
-    "name": "ZSeven-W"
+    "name": "zx-yk"
   }
 }

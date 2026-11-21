@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> • 目前外掛程式版本: <code>0.1.0-rc.11</code> • 測試版本 DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> • 目前外掛程式版本: <code>0.1.0-rc.11</code> • 測試版本 DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ Claude Code / Codex / Antigravity / Grok（協調器，保留自己的模型）
 從 npm 裝進 DSH profile：
 
 ```bash
-dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
+dsh plugin --profile web add @zoraxylia/dsh-codex-adapter@latest
 dsh web
 ```
 

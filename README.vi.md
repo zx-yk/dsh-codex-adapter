@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; Phiên bản plugin hiện tại: <code>0.1.0-rc.11</code> &middot; Đã kiểm thử với DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Phiên bản plugin hiện tại: <code>0.1.0-rc.11</code> &middot; Đã kiểm thử với DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ Việc dispatch có thể trải rộng. Bên dưới, mười tám worker dịc
 Cài từ npm vào một profile DSH:
 
 ```bash
-dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
+dsh plugin --profile web add @zoraxylia/dsh-codex-adapter@latest
 dsh web
 ```
 
