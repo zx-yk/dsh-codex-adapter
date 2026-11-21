@@ -12,7 +12,7 @@ import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks
 import { resolveWorkerCwd } from './paths.mjs';
 import { detectOrchestrator } from './process-info.mjs';
 
-const server = new McpServer({ name: 'dsh-adapter', version: '0.1.3' });
+const server = new McpServer({ name: 'dsh-adapter', version: '0.1.4' });
 
 const tierSchema = z.enum(['flash', 'pro']).optional().describe('Worker model tier. flash = mechanical, well-scoped work (single-file edits, lookups, formatting); pro = multi-file changes, debugging, design judgment. Omit to use the session default. Ignored when worker= is set.');
 const effortSchema = z.enum(['off', 'high', 'max']).optional().describe('Reasoning effort for the worker. Omit to use the session default. With worker= it only applies when passed explicitly and the profile supports it (agy maps to low/medium/high).');
@@ -46,9 +46,16 @@ const sessionConfig = {
   origin_depth_limit: DEFAULT_ORIGIN_DEPTH_LIMIT,
 };
 
-/** The {provider, model} this session dispatches `tier` to. */
+/**
+ * The {provider, model} this session pins for `tier`, or {} when the user has
+ * not pinned anything. Sending the resolved default here would look like an
+ * explicit choice to the hub and disable its usable-route fallback, which is
+ * exactly how an install without DEEPSEEK_API_KEY kept failing.
+ */
 function bindingForTier(tier) {
-  return resolveTierBinding(tier, sessionConfig);
+  const pinned = [sessionConfig[`${tier}_provider`], sessionConfig[`${tier}_model`]]
+    .some((v) => typeof v === 'string' && v.trim() !== '');
+  return pinned ? resolveTierBinding(tier, sessionConfig) : {};
 }
 
 function presetForTier(tier) {

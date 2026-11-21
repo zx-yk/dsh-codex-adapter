@@ -437,18 +437,33 @@ export async function apply(ctx) {
     // hub_url goes stale after each restart and the host-side MCP shim falls
     // back to standalone mode. Publish this instance's origin into the shared
     // config instead; a hub_url that names another machine is left untouched.
-    const syncHubUrl = (attempt = 0) => {
+    const originOf = () => {
       try {
-        const origin = webServer.getOrigin?.();
+        const value = webServer.getOrigin?.();
+        if (typeof value === 'string' && value) return value;
+      } catch { /* listener not bound yet */ }
+      try {
+        const port = webServer.port;
+        if (Number.isInteger(port) && port > 0) return 'http://127.0.0.1:' + port;
+      } catch { /* port accessor unavailable */ }
+      return undefined;
+    };
+    const syncHubUrl = (attempt = 0) => {
+      const origin = originOf();
+      if (!origin) {
+        // The listener can bind well after plugins apply; keep trying quietly.
+        if (attempt < 15) { setTimeout(() => syncHubUrl(attempt + 1), 2000).unref?.(); return; }
+        ctx.logger?.warn?.('dsh-adapter: hub_url sync gave up waiting for the listener');
+        return;
+      }
+      try {
         const current = readGlobalConfig();
         const isLocal = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(current.hub_url ?? '');
-        if (origin && (!current.hub_url || isLocal) && current.hub_url !== origin) {
+        if ((!current.hub_url || isLocal) && current.hub_url !== origin) {
           writeGlobalConfig({ hub_url: origin });
           ctx.logger?.info?.('dsh-adapter: hub_url synced to ' + origin);
         }
       } catch (err) {
-        // getOrigin() throws until the listener is bound; retry briefly.
-        if (attempt < 3) { setTimeout(() => syncHubUrl(attempt + 1), 1500).unref?.(); return; }
         ctx.logger?.warn?.('dsh-adapter: hub_url sync skipped: ' + (err?.message ?? err));
       }
     };
