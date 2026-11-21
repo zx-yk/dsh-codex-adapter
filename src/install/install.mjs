@@ -171,7 +171,7 @@ export function uninstallCodex({ home = homedir() } = {}) {
     const p = join(home, '.codex', 'prompts', f);
     if (existsSync(p)) { rmSync(p); actions.push(`removed: ${p}`); }
   }
-  const configFile = join(home, '.codex', 'config.toml');
+  const configFile = join(process.env.CODEX_HOME || join(home, '.codex'), 'config.toml');
   if (existsSync(configFile)) {
     const before = readFileSync(configFile, 'utf8');
     if (before.includes('[mcp_servers.dsh-adapter]')) {
@@ -284,28 +284,93 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
 
 /** Global Codex MCP entry: the desktop client and any plain session can call
  *  the worker tools without spawning a subagent first. */
-function codexMcpBlock(serverPath) {
-  return '[mcp_servers.dsh-adapter]\n'
-    + `command = ${tomlString(resolveNodeBinary())}\n`
-    + `args = [${tomlString(serverPath)}]\n`
-    + 'default_tools_approval_mode = "approve"\n'
-    + 'tool_timeout_sec = 3600\n';
+function codexMcpBlock(serverPath, launcher) {
+  const lines = [
+    '[mcp_servers.dsh-adapter]',
+    `command = ${tomlString(launcher.command)}`,
+    `args = [${tomlString(serverPath)}]`,
+    'default_tools_approval_mode = "approve"',
+    'tool_timeout_sec = 3600',
+  ];
+  const env = launcher.env ?? {};
+  if (Object.keys(env).length > 0) {
+    lines.push('', '[mcp_servers.dsh-adapter.env]');
+    for (const [key, value] of Object.entries(env)) lines.push(`${key} = ${tomlString(value)}`);
+  }
+  return lines.join('\n') + '\n';
 }
 
-/** Absolute node path: a GUI client's PATH often lacks the shim a terminal
- *  has, so "node" is not a safe launcher for the registered server. */
-function resolveNodeBinary() {
+/** True when this binary runs a Node the plugin's server can use. */
+function nodeUsable(binary) {
+  try {
+    const out = execFileSync(binary, ['-v'], { encoding: 'utf8', timeout: 5000 }).trim();
+    const major = Number(/^v(\d+)/.exec(out)?.[1] ?? 0);
+    return major >= 18;
+  } catch { return false; }
+}
+
+/** Any node.exe shipped inside the DSH app resources. */
+function findBundledNode() {
+  const roots = [
+    join(dirname(process.execPath), 'resources', 'runtime'),
+    join(dirname(process.execPath), 'resources'),
+  ];
+  const names = process.platform === 'win32' ? ['node.exe'] : ['node'];
+  const walk = (dir, depth) => {
+    if (depth > 4) return undefined;
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return undefined; }
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isFile() && names.includes(entry.name)) {
+        if (nodeUsable(full)) return full;
+      }
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const found = walk(join(dir, entry.name), depth + 1);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  for (const root of roots) {
+    const found = walk(root, 0);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Which binary should launch the MCP server on this machine. A GUI client's
+ * PATH often lacks the shim a terminal has, and a machine that runs DSH does
+ * not necessarily have Node installed at all:
+ *   1. explicit override            DSH_ADAPTER_NODE
+ *   2. a system node >= 18
+ *   3. a node bundled inside DSH
+ *   4. the DSH Electron binary in ELECTRON_RUN_AS_NODE mode
+ *   5. bare "node" (last resort; the action line says what happened)
+ */
+function resolveNodeLauncher() {
+  const override = process.env.DSH_ADAPTER_NODE;
+  if (override && existsSync(override) && nodeUsable(override)) return { command: override, source: 'env' };
   try {
     const which = process.platform === 'win32' ? 'where' : 'which';
     const out = execFileSync(which, ['node'], { encoding: 'utf8', timeout: 5000 });
-    const first = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0];
-    if (first && existsSync(first)) return first;
-  } catch { /* fall back below */ }
-  return 'node';
+    for (const line of out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
+      if (existsSync(line) && nodeUsable(line)) return { command: line, source: 'system' };
+    }
+  } catch { /* keep looking */ }
+  const bundled = findBundledNode();
+  if (bundled) return { command: bundled, source: 'bundled' };
+  if (process.versions?.electron && existsSync(process.execPath)) {
+    return { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' }, source: 'electron' };
+  }
+  return { command: 'node', source: 'fallback' };
 }
 
-function upsertCodexMcp(text, serverPath) {
-  const block = codexMcpBlock(serverPath);
+function upsertCodexMcp(text, serverPath, launcher = { command: 'node', source: 'fallback' }) {
+  const block = codexMcpBlock(serverPath, launcher);
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
   if (start === -1) return (text.trimEnd() ? text.trimEnd() + '\n\n' : '') + block;
@@ -349,15 +414,16 @@ export function installCodex({ home = homedir(), scope } = {}) {
   // The desktop client has no subagent spawn UI; a global MCP entry lets any
   // session call dsh_run_worker directly. Agent roles above stay for the CLI.
   try {
-    const configFile = join(home, '.codex', 'config.toml');
+    const configFile = join(process.env.CODEX_HOME || join(home, '.codex'), 'config.toml');
     mkdirSync(dirname(configFile), { recursive: true });
     const before = existsSync(configFile) ? readFileSync(configFile, 'utf8') : '';
     const bak = backup(configFile);
     if (bak) actions.push(`backup: ${bak}`);
-    const next = upsertCodexMcp(before, join(ROOT, 'src', 'server.mjs'));
+    const launcher = resolveNodeLauncher();
+    const next = upsertCodexMcp(before, join(ROOT, 'src', 'server.mjs'), launcher);
     if (next !== before) {
       writeFileSync(configFile, next);
-      actions.push('mcp: registered dsh-adapter globally (approve, 3600s) — restart Codex to load it');
+      actions.push(`mcp: registered dsh-adapter globally (launcher: ${launcher.source}, approve, 3600s) — restart Codex to load it`);
     } else {
       actions.push('mcp: dsh-adapter already registered');
     }
