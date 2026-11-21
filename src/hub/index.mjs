@@ -890,7 +890,7 @@ export async function apply(ctx) {
               actions: [...base.actions, ...hud.actions.map((a) => `hud: ${a}`)],
             });
           }
-          if (target === 'codex') return sendJson(res, 200, installCodex({}));
+          if (target === 'codex') return sendJson(res, 200, installCodex({ globalMcp: hub.getConfig().codex_global_mcp !== false }));
           if (target === 'agy') return sendJson(res, 200, installAgy({}));
           if (target === 'grok') return sendJson(res, 200, installGrok({}));
           if (target === 'claude-uninstall') return sendJson(res, 200, await uninstallClaudeCode({}));

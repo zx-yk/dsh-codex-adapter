@@ -83,6 +83,9 @@ export const GLOBAL_CONFIG_DEFAULTS = {
   // auto = orchestrator picks the tier; flash-only / pro-only clamp every
   // dispatch to one tier at the tool layer regardless of what was requested.
   tier_policy: 'auto',
+  // Register the MCP server globally in ~/.codex/config.toml so the Codex
+  // desktop client (which has no subagent spawn UI) can call the worker tools.
+  codex_global_mcp: true,
   // When a blocking flash run fails, retry the same task once on pro.
   escalate_on_failure: false,
   // Multimodal bridge: which subscription CLI lends the text-only DS model
@@ -390,7 +393,7 @@ function removeCodexMcp(text) {
   return [...lines.slice(0, start), ...lines.slice(end)].join('\n');
 }
 
-export function installCodex({ home = homedir(), scope } = {}) {
+export function installCodex({ home = homedir(), scope, globalMcp = true } = {}) {
   const actions = [];
   const agentsDir = scope === 'project' ? join(process.cwd(), '.codex', 'agents') : join(home, '.codex', 'agents');
   mkdirSync(agentsDir, { recursive: true });
@@ -417,6 +420,17 @@ export function installCodex({ home = homedir(), scope } = {}) {
     const configFile = join(process.env.CODEX_HOME || join(home, '.codex'), 'config.toml');
     mkdirSync(dirname(configFile), { recursive: true });
     const before = existsSync(configFile) ? readFileSync(configFile, 'utf8') : '';
+    if (!globalMcp) {
+      if (before.includes('[mcp_servers.dsh-adapter]')) {
+        const bak = backup(configFile);
+        if (bak) actions.push(`backup: ${bak}`);
+        writeFileSync(configFile, removeCodexMcp(before));
+        actions.push('mcp: global registration disabled — entry removed');
+      } else {
+        actions.push('mcp: global registration disabled');
+      }
+      return { ok: true, actions };
+    }
     const bak = backup(configFile);
     if (bak) actions.push(`backup: ${bak}`);
     const launcher = resolveNodeLauncher();

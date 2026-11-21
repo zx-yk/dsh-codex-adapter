@@ -88,6 +88,8 @@ const COPY = {
     title: 'DSH Adapter',
     intro: 'Claude Code / Codex 可以给 DSH agent 分派任务，在宿主里显示为原生子代理、进度可见。配置派发默认值、执行方式，以及接入视觉与生图能力，一键装进宿主。',
     integrations: '集成',
+    globalMcp: 'Codex 全局 MCP（CLI 与桌面端都可直接调用）',
+    globalMcpHint: '关闭后只安装 ds-flash / ds-pro 子代理角色，不注册全局 MCP；桌面端将无法直接调用。',
     collapse: '折叠', expand: '展开',
     doneAt: (t: string) => `已更新 · ${t}`,
     installed: '已安装', notInstalled: '未安装', hud: 'HUD 段',
@@ -182,6 +184,8 @@ const COPY = {
     title: 'DSH Adapter',
     intro: 'Claude Code / Codex can dispatch tasks to DSH agents and see them as native subagents in the host with live progress. Configure dispatch defaults, execution mode, and vision / image-generation access, then install into the host in one click.',
     integrations: 'Integrations',
+    globalMcp: 'Codex global MCP (callable from both CLI and the desktop client)',
+    globalMcpHint: 'When off, only the ds-flash / ds-pro agent roles are installed; the desktop client cannot call the worker tools directly.',
     collapse: 'Collapse', expand: 'Expand',
     doneAt: (t: string) => `Updated · ${t}`,
     installed: 'installed', notInstalled: 'not installed', hud: 'HUD segment',
@@ -813,6 +817,19 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           {integrationRow('Codex', !!status?.codex?.installed, null, 'codex', 'codex-uninstall', (copy as any).tips.codex)}
           {integrationRow('Antigravity', !!status?.agy?.installed, null, 'agy', 'agy-uninstall', (copy as any).tips.agy)}
           {integrationRow('Grok', !!status?.grok?.installed, null, 'grok', 'grok-uninstall', (copy as any).tips.grok)}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, paddingLeft: 2, opacity: config ? 1 : 0.5 }}
+            title={copy.globalMcpHint}>
+            <input type="checkbox" checked={config?.codex_global_mcp !== false} disabled={busy || !config}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setConfig((c: any) => ({ ...c, codex_global_mcp: on }));
+                void post('/config', { codex_global_mcp: on }).then((r) => {
+                  if (r.ok) setConfig(r.config);
+                  if (status?.codex?.installed) void act('codex');
+                });
+              }} />
+            <span>{copy.globalMcp}</span>
+          </label>
         </div>
       )}
 
