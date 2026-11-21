@@ -1,25 +1,35 @@
-# Publish to npm when a version tag is pushed.
+# Manual release pipeline (fork-friendly).
 #
-# Authentication: npm trusted publishing (OIDC) only. The workflow proves its
-# identity to the registry (hence `permissions.id-token: write`); there is no
-# token secret and nothing to log in to. The trust relationship is configured
-# once per package (npm-oidc-setup.sh, or npmjs.com -> package -> Settings ->
-# Trusted Publisher -> GitHub Actions, this repository, release.yml).
+# Why this is not `on: push: tags` anymore:
+#   * a tag push used to start a full install/build/smoke cycle — minutes a
+#     fork does not need to spend on every version marker;
+#   * the publish step can only succeed for the upstream repository, because
+#     npm trusted publishing (OIDC) is bound to ZSeven-W/dsh-crew. In a fork
+#     the build ran, the publish failed, and nothing was gained.
 #
-# Every release publishes straight to `latest`, prereleases included: in this
-# 0.x line each rc is the version users should get, and OIDC can only set the
-# tag of the publish itself (moving a dist-tag afterwards would need a login).
+# Run it from Actions -> release -> Run workflow when you actually want a
+# verified tarball. Publishing stays available for the upstream repository
+# (set `publish: true` there); everywhere else build locally with
+# `pnpm run release:local`.
 name: release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to npm (upstream repository only, needs OIDC trust)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # required for trusted publishing
+      id-token: write   # trusted publishing; only the publish step uses it
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -40,9 +50,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The tag must match what is about to be published, or the release
-      # silently ships a version nobody asked for.
+      # Only meaningful when the run was started from a tag ref.
       - name: Verify the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(node -p "require('./package.json').version")"
@@ -51,23 +61,32 @@ jobs:
             exit 1
           fi
 
-      # Rebuild the committed artifacts from the tagged sources and prove the
-      # bundle still starts: lib/client.js and lib/server.mjs are what the
-      # host actually loads, and a stale one would ship unnoticed.
+      # Rebuild the committed artifacts from the sources and prove the bundle
+      # still starts: lib/client.js and lib/server.mjs are what the host
+      # actually loads, and a stale one would ship unnoticed.
       - name: Build and smoke-test the bundle
         run: pnpm run build && pnpm run smoke:mcp
 
       # smoke:pack installs the packed tarball the way a user would and is the
-      # only check that all four version fields agree. It never ran here, and
-      # 0.1.0-rc.5 shipped with plugin.json and serverInfo a version behind.
+      # only check that all four version fields agree.
       - name: Smoke-test the packed tarball
         run: pnpm run smoke:pack
 
+      - name: Pack the tarball
+        run: mkdir -p dist && npm pack --pack-destination dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-crew-pack
+          path: dist/*.tgz
+          if-no-files-found: error
+
       # Publishing is skipped when the registry already has this version.
       # npm refuses to publish over an existing version, so without the guard
-      # a re-pushed tag — or a version first published by hand — turns the
-      # release red for a reason nobody needs to act on.
+      # a re-run — or a version first published by hand — turns the release red
+      # for a reason nobody needs to act on.
       - name: Publish
+        if: inputs.publish && github.repository == 'ZSeven-W/dsh-crew'
         run: |
           name="$(node -p "require('./package.json').name")"
           pkg="$(node -p "require('./package.json').version")"
@@ -76,3 +95,7 @@ jobs:
             exit 0
           fi
           npm publish --access public --tag latest
+
+      - name: Skip publish (fork or publish=false)
+        if: ${{ !inputs.publish || github.repository != 'ZSeven-W/dsh-crew' }}
+        run: 'echo "Build verified only. Publish locally with: pnpm run release:local"'

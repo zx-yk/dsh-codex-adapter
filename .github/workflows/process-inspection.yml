@@ -1,19 +1,29 @@
 name: Process inspection
 
+# Deliberately narrow: pull requests and manual runs only.
+# `push: branches: [main]` used to start this on every commit, and the matrix
+# included windows-latest, which is billed at 2x. For a fork that is minutes
+# spent on changes nobody is reviewing yet.
+#
+# Need Windows coverage? Add 'windows-latest' back to the matrix below, or run
+# the same test locally on Windows: node --test tests/process-inspection.test.mjs
 on:
-  push:
-    branches: [main, 'fix/windows-process-inspection']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: process-inspection-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   native-process-inspection:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
