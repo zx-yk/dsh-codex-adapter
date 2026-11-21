@@ -10,6 +10,9 @@ import { isAbsoluteCwd, canonicalCwd } from '../paths.mjs';
 import { createShardWriter, readMergedStatus } from '../status-shard.mjs';
 import { procAlive, killWorkerProcess, parsePid, ProcKillRefused } from '../proc-kill.mjs';
 import { installWorkerQuestionHandoff } from '../worker-question.mjs';
+import { appendHistory, backfillHistory, historyStats, readHistory, readHistoryIds } from '../history.mjs';
+
+const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled']);
 import { probeProvider } from '../provider-probe.mjs';
 
 // No @deepseek-ai imports here on purpose: this plugin is loaded into the
@@ -121,7 +124,14 @@ export class WorkerRegistry {
   }
 
   publish() {
-    this.shard.publish([...this.jobs.values()].map((j) => this.view(j)));
+    const jobs = [...this.jobs.values()];
+    this.shard.publish(jobs.map((j) => this.view(j)));
+    // Persist each terminal job exactly once; the live board forgets on restart.
+    this.recorded ??= readHistoryIds();
+    for (const job of jobs) {
+      if (!HISTORY_TERMINAL.has(job.status) || this.recorded.has(job.id)) continue;
+      try { appendHistory(job); this.recorded.add(job.id); } catch { /* history is best-effort */ }
+    }
   }
 
   /**
@@ -535,6 +545,7 @@ export async function apply(ctx) {
   try {
     const { readGlobalConfig } = await import('../install/install.mjs');
     hub.getConfig = () => mergeAutoProviders(readGlobalConfig());
+    try { backfillHistory(); } catch { /* best effort */ }
     hub.refreshAutoProviders = refreshAutoProviders;
     void refreshAutoProviders();
   } catch {}
@@ -898,6 +909,29 @@ export async function apply(ctx) {
           if (target === 'agy-uninstall') return sendJson(res, 200, uninstallAgy({}));
           if (target === 'grok-uninstall') return sendJson(res, 200, uninstallGrok({}));
           return sendJson(res, 400, { ok: false, error: 'target must be claude | codex | agy | grok | claude-uninstall | codex-uninstall | agy-uninstall | grok-uninstall' });
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
+        }
+      },
+    }));
+
+
+    disposers.push(webServer.register({
+      kind: 'exact', path: `${ROUTE_BASE}/history`,
+      handler: async (req, res) => {
+        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        if (req.method !== 'GET') return sendJson(res, 405, { ok: false, error: 'GET only' });
+        try {
+          const url = new URL(req.url, 'http://localhost');
+          const filter = {
+            tier: url.searchParams.get('tier') || undefined,
+            status: url.searchParams.get('status') || undefined,
+            source: url.searchParams.get('source') || undefined,
+          };
+          const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 100));
+          const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+          const { records, total } = readHistory({ ...filter, limit, offset });
+          return sendJson(res, 200, { ok: true, records, total, stats: historyStats(filter) });
         } catch (err) {
           return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
         }

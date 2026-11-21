@@ -137,6 +137,9 @@ const COPY = {
     cardCustomProv: { t: '自定义 Provider', d: '接入自己的 API 或本地命令；保存后会出现在上面的视觉 / 生图 provider 选择里。' },
     modeDesc: { auto: 'auto · 优先 hub', hub: 'hub · 必须 hub', standalone: 'standalone · 独立进程' },
     save: '保存', saved: '已保存', jobs: 'Worker 任务', empty: '当前没有 worker 任务。',
+    history: '历史看板', historyEmpty: '还没有历史记录。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
+    historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
+    historyStatus: '状态', historyCost: '耗时', historyTask: '任务',
     statusRunning: '运行中', statusStalled: '疑似卡住', statusNeedsInput: '需输入', statusDone: '完成', statusFailed: '失败', statusCancelled: '已取消', statusOrphaned: '失联',
     statusTitle: (s: string) => `状态：${s}`,
     orphanWriterGone: (origin: string) => `所属实例已消失：写入该状态的进程（${origin}）已不存在，任务随它一起终止（最后状态 running）`,
@@ -233,6 +236,9 @@ const COPY = {
     cardCustomProv: { t: 'Custom providers', d: 'Bring your own API or local command; saved providers appear in the vision / image-gen selects above.' },
     modeDesc: { auto: 'auto · prefer hub', hub: 'hub · require hub', standalone: 'standalone' },
     save: 'Save', saved: 'Saved', jobs: 'Worker jobs', empty: 'No worker jobs yet.',
+    history: 'History', historyEmpty: 'No history yet.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
+    historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
+    historyStatus: 'Status', historyCost: 'Duration', historyTask: 'Task',
     statusRunning: 'running', statusStalled: 'stalled', statusNeedsInput: 'needs input', statusDone: 'done', statusFailed: 'failed', statusCancelled: 'cancelled', statusOrphaned: 'orphaned',
     statusTitle: (s: string) => `status: ${s}`,
     orphanWriterGone: (origin: string) => `Owning instance gone: the process that wrote this status (${origin}) no longer exists — the job died with it (last status: running)`,
@@ -416,6 +422,9 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   // Per-integration feedback, rendered next to the button that was pressed.
   const [rowNote, setRowNote] = useState<Record<string, { kind: 'working' | 'ok' | 'error'; text: string }>>({});
   const [busy, setBusy] = useState(false);
+  const [historyRows, setHistoryRows] = useState<any[]>([]);
+  const [historyAgg, setHistoryAgg] = useState<any>(null);
+  const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [provForm, setProvForm] = useState<{
     originalId?: string; name: string; type: 'api' | 'cli'; models: string;
     base_url: string; api_key: string; imagegen_model: string;
@@ -569,6 +578,13 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       if (r.ok) { setConfig(r.config); setNotice(copy.saved); setTimeout(() => setNotice(''), 1500); }
     }).catch(() => {});
   }, [post, copy]);
+  const loadHistory = useCallback(() => {
+    void get('/history?limit=100').then((r) => {
+      if (r.ok) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
+    }).catch(() => {});
+  }, [get]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
   /** Selects & checkboxes: apply immediately. */
   const field = (key: string, value: any) => {
     setConfig((c: any) => ({ ...c, [key]: value }));
@@ -1031,6 +1047,57 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       </>)}
 
       {notice !== '' && <div style={{ fontSize: 12, opacity: 0.8, whiteSpace: 'pre-wrap' }}>{notice}</div>}
+
+      {sectionHeader(copy.history, historyCollapsed, () => setHistoryCollapsed((v) => !v))}
+      {!historyCollapsed && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
+            <span>{copy.historyTotal}: <b>{historyAgg?.total ?? 0}</b></span>
+            <span>{copy.historyDone}: <b>{historyAgg?.done ?? 0}</b></span>
+            <span>{copy.historyFailed}: <b>{historyAgg?.failed ?? 0}</b></span>
+            <span>{copy.historyAvg}: <b>{historyAgg?.avgSeconds ?? 0}s</b></span>
+            <span style={{ flex: 1 }} />
+            <button type="button" style={{ ...S.btn, padding: '2px 8px' }} onClick={loadHistory}>{copy.historyRefresh}</button>
+          </div>
+          {historyRows.length === 0 ? (
+            <div style={{ opacity: 0.55, fontSize: 12 }}>{copy.historyEmpty}</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', opacity: 0.6 }}>
+                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyTime}</th>
+                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyTier}</th>
+                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyModel}</th>
+                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyStatus}</th>
+                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyCost}</th>
+                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyTask}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.map((r) => {
+                    const start = Date.parse(r.startedAt ?? '');
+                    const end = Date.parse(r.endedAt ?? '');
+                    const secs = Number.isFinite(start) && Number.isFinite(end) && end >= start ? ((end - start) / 1000).toFixed(1) + 's' : '—';
+                    const color = r.status === 'failed' ? '#e5484d' : r.status === 'done' ? '#3fb950' : undefined;
+                    return (
+                      <tr key={r.id} style={{ borderTop: '1px solid rgba(128,128,128,0.14)' }}>
+                        <td style={{ padding: '4px 6px', whiteSpace: 'nowrap' }}>{r.endedAt ? new Date(r.endedAt).toLocaleString() : '—'}</td>
+                        <td style={{ padding: '4px 6px' }}>{r.tier ?? '—'}</td>
+                        <td style={{ padding: '4px 6px' }}>{r.model ?? '—'}{r.effort ? ` @${r.effort}` : ''}</td>
+                        <td style={{ padding: '4px 6px', color }}>{r.status ?? '—'}</td>
+                        <td style={{ padding: '4px 6px', whiteSpace: 'nowrap' }}>{secs}</td>
+                        <td style={{ padding: '4px 6px', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={r.task ?? ''}>{r.task ?? '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={S.section}>{copy.jobs}</div>
       {!jobsLoaded || groups.length === 0 ? (
