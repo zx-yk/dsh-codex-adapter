@@ -2,7 +2,7 @@
 // global worker configuration, and the live jobs table.
 // Talks only to the plugin's own loopback routes.
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
 import { reconcileGhosts, displayJobs, groupJobs, workspaceKey, basenameOf, abbrevPath, workspaceLocks, lockBadgeOf, statusInfoOf, ghostPidOf, procBadgeOf, dueProcProbes } from './jobs-view';
@@ -140,6 +140,9 @@ const COPY = {
     history: '历史看板', historyEmpty: '还没有历史记录。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
     historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
     historyStatus: '状态', historyCost: '耗时', historyTask: '任务',
+    eventsTitle: '事件流', eventsEmpty: '还没有事件。', eventsOnlyHub: '只有 hub 任务有事件流。', eventsHint: '点击行展开事件流',
+    eventsMeta: (j: any) => `${j.provider ?? '?'}/${j.model ?? '?'}${j.effort ? ' @' + j.effort : ''} · ${j.timeoutSeconds ? j.timeoutSeconds + 's 上限' : '无上限'}${j.staleSeconds != null ? ' · 静默 ' + j.staleSeconds + 's' : ''}`,
+    eventText: '输出', eventTool: '工具', eventResult: '结果', eventStep: '步骤', eventEnd: '结束',
     statusRunning: '运行中', statusStalled: '疑似卡住', statusNeedsInput: '需输入', statusDone: '完成', statusFailed: '失败', statusCancelled: '已取消', statusOrphaned: '失联',
     statusTitle: (s: string) => `状态：${s}`,
     orphanWriterGone: (origin: string) => `所属实例已消失：写入该状态的进程（${origin}）已不存在，任务随它一起终止（最后状态 running）`,
@@ -241,6 +244,9 @@ const COPY = {
     history: 'History', historyEmpty: 'No history yet.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
     historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
     historyStatus: 'Status', historyCost: 'Duration', historyTask: 'Task',
+    eventsTitle: 'Events', eventsEmpty: 'No events yet.', eventsOnlyHub: 'Only hub jobs expose an event stream.', eventsHint: 'Click a row to expand its event stream',
+    eventsMeta: (j: any) => `${j.provider ?? '?'}/${j.model ?? '?'}${j.effort ? ' @' + j.effort : ''} · ${j.timeoutSeconds ? j.timeoutSeconds + 's cap' : 'no cap'}${j.staleSeconds != null ? ' · quiet ' + j.staleSeconds + 's' : ''}`,
+    eventText: 'text', eventTool: 'tool', eventResult: 'result', eventStep: 'step', eventEnd: 'end',
     statusRunning: 'running', statusStalled: 'stalled', statusNeedsInput: 'needs input', statusDone: 'done', statusFailed: 'failed', statusCancelled: 'cancelled', statusOrphaned: 'orphaned',
     statusTitle: (s: string) => `status: ${s}`,
     orphanWriterGone: (origin: string) => `Owning instance gone: the process that wrote this status (${origin}) no longer exists — the job died with it (last status: running)`,
@@ -427,6 +433,9 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [rowNote, setRowNote] = useState<Record<string, { kind: 'working' | 'ok' | 'error'; text: string }>>({});
   const [busy, setBusy] = useState(false);
   const [historyRows, setHistoryRows] = useState<any[]>([]);
+  const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [jobEvents, setJobEvents] = useState<Record<string, { items: any[]; status?: string; stale?: number | null }>>({});
+  const jobCursor = useRef<Record<string, number>>({});
   const [historyAgg, setHistoryAgg] = useState<any>(null);
   const [provForm, setProvForm] = useState<{
     originalId?: string; name: string; type: 'api' | 'cli'; models: string;
@@ -594,6 +603,36 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     }).catch(() => {});
   }, [get]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const loadJobEvents = useCallback(async (id: string) => {
+    try {
+      const r = await get(`/jobs/${encodeURIComponent(id)}/events?after=${jobCursor.current[id] ?? 0}&wait=0`);
+      if (!r.ok) return;
+      jobCursor.current[id] = r.cursor ?? jobCursor.current[id] ?? 0;
+      setJobEvents((m) => ({
+        ...m,
+        [id]: { items: [...(m[id]?.items ?? []), ...(r.events ?? [])].slice(-200), status: r.status, stale: r.staleSeconds },
+      }));
+    } catch { /* hub restarting */ }
+  }, [get]);
+
+  const toggleJob = useCallback((id: string) => {
+    setExpandedJob((current) => {
+      if (current === id) return null;
+      jobCursor.current[id] = 0;
+      setJobEvents((m) => ({ ...m, [id]: { items: [] } }));
+      void loadJobEvents(id);
+      return id;
+    });
+  }, [loadJobEvents]);
+
+  useEffect(() => {
+    if (!expandedJob) return;
+    const job = jobs.find((j: any) => j?.id === expandedJob);
+    if (!job || job.status !== 'running') return;
+    const timer = setInterval(() => { void loadJobEvents(expandedJob); }, 2000);
+    return () => clearInterval(timer);
+  }, [expandedJob, jobs, loadJobEvents]);
 
   /** Selects & checkboxes: apply immediately. */
   const field = (key: string, value: any) => {
@@ -769,8 +808,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     const ghostRow = !!ghosts[job.id] && !jobs.some((l) => l?.id === job.id);
     const info = statusInfoOf(job, copy);
     const pb = procBadgeOf(job, procProbe[job.id]);
+    const expanded = expandedJob === job.id;
+    const ev = jobEvents[job.id];
     return (
-      <tr key={job.id} style={job.status === 'orphaned' ? { background: 'rgba(240,136,62,0.05)' } : undefined}>
+      <Fragment key={job.id}>
+      <tr onClick={() => toggleJob(job.id)} title={copy.eventsHint}
+        style={{ cursor: 'pointer', ...(job.status === 'orphaned' ? { background: 'rgba(240,136,62,0.05)' } : {}) }}>
         <td style={{ ...S.tight, ...S.mono }} title={job.origin ? `${job.id} · ${job.origin}` : job.id}>{String(job.id).replace(/-[a-z0-9]+$/, '')}</td>
         <td style={S.tight}><span style={S.chip(job.source === 'claude-code' || job.source === 'codex')}>{sourceLabel(job.source)}</span></td>
         <td style={S.tight} title={job.profile ? `profile: ${job.profile} · backend: ${job.backend}` : undefined}>{job.tier}/{job.effort}</td>
@@ -787,7 +830,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
             {ghostRow && (
               <button type="button" title={copy.orphanDismiss} aria-label={copy.orphanDismiss}
                 style={{ border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 12, padding: 0, opacity: 0.55, lineHeight: 1 }}
-                onClick={() => dismissGhost(job.id)}>×</button>
+                onClick={(e: any) => { e.stopPropagation(); dismissGhost(job.id); }}>×</button>
             )}
           </div>
         </td>
@@ -828,6 +871,50 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           </div>
         </td>
       </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={7} style={{ ...S.tight, background: 'rgba(128,128,128,0.045)', padding: '8px 10px' }}>
+            <div style={{ fontSize: 11.5, opacity: 0.75, marginBottom: 6 }}>
+              {copy.eventsTitle} · {copy.eventsMeta(job)}
+            </div>
+            {!String(job.id).startsWith('hub-') ? (
+              <div style={{ fontSize: 11.5, opacity: 0.6 }}>{copy.eventsOnlyHub}</div>
+            ) : (ev?.items?.length ?? 0) === 0 ? (
+              <div style={{ fontSize: 11.5, opacity: 0.6 }}>{copy.eventsEmpty}</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 260, overflowY: 'auto' }}>
+                {ev!.items.map((e: any) => {
+                  const label = e.kind === 'tool' ? copy.eventTool
+                    : e.kind === 'tool-result' ? copy.eventResult
+                    : e.kind === 'text' ? copy.eventText
+                    : e.kind === 'step' ? copy.eventStep
+                    : e.kind === 'turn-end' ? copy.eventEnd
+                    : e.kind;
+                  const color = e.kind === 'tool' ? '#4c8dff'
+                    : e.kind === 'tool-result' ? (e.ok === false ? '#e5484d' : '#3fb950')
+                    : undefined;
+                  const body = e.kind === 'step' ? `${e.turn ?? '?'}.${e.step ?? '?'}`
+                    : e.kind === 'tool' ? `${e.tool}${e.detail ? ' ' + e.detail : ''}`
+                    : e.kind === 'tool-result' ? `${e.tool ?? ''}${e.detail ? ' ' + e.detail : ''}`
+                    : e.kind === 'text' ? e.text
+                    : e.kind === 'turn-end' ? (e.reason ?? '')
+                    : '';
+                  return (
+                    <div key={e.seq} style={{ display: 'flex', gap: 8, fontSize: 11.5, lineHeight: 1.55 }}>
+                      <span style={{ opacity: 0.5, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                        {e.at ? new Date(e.at).toLocaleTimeString() : ''}
+                      </span>
+                      <span style={{ minWidth: 42, flexShrink: 0, color }}>{label}</span>
+                      <span style={{ flex: 1, minWidth: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', opacity: 0.9 }}>{body}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+      </Fragment>
     );
   };
 
