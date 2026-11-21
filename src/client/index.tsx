@@ -136,7 +136,7 @@ const COPY = {
     cardMM: { t: '视觉与生图', d: '给纯文本的 DSH 模型借来眼睛和画笔：describe_image、会话贴图转写与 generate_image 都用这里的设置。' },
     cardCustomProv: { t: '自定义 Provider', d: '接入自己的 API 或本地命令；保存后会出现在上面的视觉 / 生图 provider 选择里。' },
     modeDesc: { auto: 'auto · 优先 hub', hub: 'hub · 必须 hub', standalone: 'standalone · 独立进程' },
-    save: '保存', saved: '已保存', jobs: 'Worker 任务', empty: '当前没有 worker 任务。',
+    save: '保存', saved: '已保存', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。',
     history: '历史看板', historyEmpty: '还没有历史记录。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
     historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
     historyStatus: '状态', historyCost: '耗时', historyTask: '任务',
@@ -235,7 +235,7 @@ const COPY = {
     cardMM: { t: 'Vision & image generation', d: "Lends the harness's text-only models eyes and a brush: describe_image, pasted-image transcription and generate_image all use these settings." },
     cardCustomProv: { t: 'Custom providers', d: 'Bring your own API or local command; saved providers appear in the vision / image-gen selects above.' },
     modeDesc: { auto: 'auto · prefer hub', hub: 'hub · require hub', standalone: 'standalone' },
-    save: 'Save', saved: 'Saved', jobs: 'Worker jobs', empty: 'No worker jobs yet.',
+    save: 'Save', saved: 'Saved', jobs: 'Live worker jobs', empty: 'No worker jobs yet.',
     history: 'History', historyEmpty: 'No history yet.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
     historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
     historyStatus: 'Status', historyCost: 'Duration', historyTask: 'Task',
@@ -726,8 +726,17 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   );
 
   const integrationRow = (name: string, installed: boolean, extra: any, installTarget: string, uninstallTarget: string, tips: any) => (
-    <div style={S.card}>
-      <span style={{ fontWeight: 600, fontSize: 13, minWidth: 92 }}>{name}</span>
+    <div style={{ ...S.card, transition: 'background 120ms ease', borderRadius: 8 }}
+      onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.06)'; }}
+      onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 13, minWidth: 92 }}>
+        <span aria-hidden="true" title={installed ? copy.installed : copy.notInstalled} style={{
+          width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+          background: installed ? '#3fb950' : 'rgba(128,128,128,0.45)',
+          boxShadow: installed ? '0 0 0 2px rgba(63,185,80,0.18)' : 'none',
+        }} />
+        {name}
+      </span>
       <span style={S.chip(installed)}>{installed ? `● ${copy.installed}` : `○ ${copy.notInstalled}`}</span>
       {extra}
       <span style={{ flex: 1 }} />
@@ -813,22 +822,55 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     );
   };
 
+  const runningJobs = jobsLoaded ? jobs.filter((j: any) => j.status === 'running' && j.originWriterAlive !== false).length : 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, lineHeight: 1.55 }}>
       <div style={{ fontSize: 19, fontWeight: 600, marginBottom: -2 }}>{copy.title}</div>
       <div style={{ opacity: 0.75 }}>{copy.intro}</div>
 
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid rgba(128,128,128,0.2)', marginTop: 2 }}>
-        {([['integrations', copy.integrations], ['config', copy.globalConfig], ['history', copy.history]] as const).map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setTab(key)}
-            style={{
-              padding: '6px 12px', fontSize: 12.5, border: 'none', background: 'transparent', cursor: 'pointer',
-              color: tab === key ? 'inherit' : 'rgba(128,128,128,0.85)',
-              fontWeight: tab === key ? 600 : 400,
-              borderBottom: tab === key ? '2px solid #4c8dff' : '2px solid transparent',
-              marginBottom: -1,
-            }}>{label}</button>
-        ))}
+      <div role="tablist" aria-label={copy.title}
+        onKeyDown={(e: any) => {
+          if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+          e.preventDefault();
+          const index = TABS.indexOf(tab);
+          const step = e.key === 'ArrowRight' ? 1 : TABS.length - 1;
+          setTab(TABS[(index + step) % TABS.length]);
+        }}
+        style={{
+          position: 'sticky', top: 0, zIndex: 6, display: 'flex', gap: 2, marginTop: 2,
+          paddingTop: 4, marginBottom: -1,
+          background: 'Canvas',
+          borderBottom: '1px solid rgba(128,128,128,0.2)',
+          boxShadow: '0 1px 0 rgba(128,128,128,0.06)',
+        }}>
+        {([['integrations', copy.integrations], ['config', copy.globalConfig], ['history', copy.history]] as const).map(([key, label]) => {
+          const active = tab === key;
+          return (
+            <button key={key} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+              onClick={() => setTab(key)}
+              onMouseEnter={(e: any) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.10)'; }}
+              onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
+              style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '6px 12px', fontSize: 12.5, border: 'none', background: 'transparent',
+                cursor: 'pointer', borderRadius: '6px 6px 0 0',
+                color: active ? 'inherit' : 'rgba(128,128,128,0.9)',
+                fontWeight: active ? 600 : 400,
+                borderBottom: `2px solid ${active ? '#4c8dff' : 'transparent'}`,
+                transition: 'color 120ms ease, border-color 120ms ease, background 120ms ease',
+              }}>
+              {label}
+              {key === 'history' && runningJobs > 0 && (
+                <span aria-label={String(runningJobs)} style={{
+                  marginLeft: 6, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 99,
+                  background: '#4c8dff', color: '#fff', fontSize: 10.5, lineHeight: '16px',
+                  textAlign: 'center', fontWeight: 600,
+                }}>{runningJobs}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {tab === 'integrations' && (
@@ -1085,7 +1127,9 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                     const secs = Number.isFinite(start) && Number.isFinite(end) && end >= start ? ((end - start) / 1000).toFixed(1) + 's' : '—';
                     const color = r.status === 'failed' ? '#e5484d' : r.status === 'done' ? '#3fb950' : undefined;
                     return (
-                      <tr key={r.id} style={{ borderTop: '1px solid rgba(128,128,128,0.14)' }}>
+                      <tr key={r.id} style={{ borderTop: '1px solid rgba(128,128,128,0.14)', transition: 'background 120ms ease' }}
+                        onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.05)'; }}
+                        onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}>
                         <td style={{ padding: '4px 6px', whiteSpace: 'nowrap' }}>{r.endedAt ? new Date(r.endedAt).toLocaleString() : '—'}</td>
                         <td style={{ padding: '4px 6px' }}>{r.tier ?? '—'}</td>
                         <td style={{ padding: '4px 6px' }}>{r.model ?? '—'}{r.effort ? ` @${r.effort}` : ''}</td>
