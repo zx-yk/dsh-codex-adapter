@@ -84,6 +84,7 @@ const ROUTE_BASE = '/_dsh/dsh-adapter';
 // caller may override per dispatch, and the hub's own config is the fallback
 // when it does not (the same shape the preset lookup below uses).
 import { describeBindings, resolveTierBinding, TIERS } from '../tier-binding.mjs';
+import { readGlobalConfig, writeGlobalConfig } from '../install/install.mjs';
 const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 
 // ---------- job registry ----------
@@ -122,6 +123,30 @@ export class WorkerRegistry {
     this.shard.publish([...this.jobs.values()].map((j) => this.view(j)));
   }
 
+  /**
+   * Ask the host what reasoning efforts this exact model accepts. DSH resolves
+   * model metadata through the adapter (the same call that rejects an
+   * unsupported effort before any provider I/O), so this is the authoritative
+   * dictionary - no provider-specific guessing. Returns {effort} for the value
+   * to dispatch with, or null when the adapter offers no reasoning metadata.
+   */
+  async effortForModel(llm, binding, desired) {
+    if (typeof llm.resolveModelInfo !== 'function') return null;
+    let info;
+    try { info = await llm.resolveModelInfo(binding.provider, binding.model); }
+    catch { return null; }
+    const reasoning = info?.reasoning;
+    if (!reasoning) return { effort: undefined, supported: [] };
+    const ids = (reasoning.efforts ?? []).map((e) => e.id).filter((id) => typeof id === 'string');
+    if (ids.length === 0) return null;
+    if (desired === undefined) return { effort: reasoning.defaultEffort ?? ids[0], supported: ids };
+    if (ids.includes(desired)) return { effort: desired, supported: ids };
+    for (const candidate of ['max', 'high', 'medium', 'off']) {
+      if (ids.includes(candidate)) return { effort: candidate, supported: ids };
+    }
+    return { effort: reasoning.defaultEffort ?? ids[0], supported: ids };
+  }
+
   /** One bounded capability probe; the route counts as usable when it streams. */
   async probeRoute(llm, binding, effort) {
     try {
@@ -158,22 +183,34 @@ export class WorkerRegistry {
       for (const m of models.slice(0, 3)) candidates.push({ provider: id, model: m.id });
       if (candidates.length >= 5) break;
     }
-    const attempts = effort && effort !== 'off' ? [effort, 'off'] : [effort];
-    for (const attemptEffort of attempts) {
-      for (const candidate of candidates) {
+    for (const candidate of candidates) {
+      const known = await this.effortForModel(llm, candidate, effort);
+      let attemptEffort;
+      if (known) {
+        // The host already answered which efforts this model accepts; the
+        // probe below only proves the route streams.
+        attemptEffort = known.supported.length === 0 ? undefined : known.effort;
         if (!(await this.probeRoute(llm, candidate, attemptEffort))) continue;
-        const chosen = { binding: candidate, effort: attemptEffort };
-        this.autoTier[cacheKey] = chosen;
-        try {
-          writeGlobalConfig({
-            [`${tier}_provider`]: candidate.provider,
-            [`${tier}_model`]: candidate.model,
-            [`${tier}_auto`]: true,
-          });
-        } catch { /* read-only home: keep the in-memory choice */ }
-        this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model} @ ${attemptEffort}`);
-        return chosen;
+      } else {
+        // No reasoning metadata from the adapter: probe the wanted effort, then
+        // 'off', which is the cheapest compatible setting.
+        attemptEffort = undefined;
+        for (const candidateEffort of effort && effort !== 'off' ? [effort, 'off'] : [effort ?? undefined]) {
+          if (await this.probeRoute(llm, candidate, candidateEffort)) { attemptEffort = candidateEffort; break; }
+        }
+        if (attemptEffort === undefined && !(await this.probeRoute(llm, candidate, undefined))) continue;
       }
+      const chosen = { binding: candidate, effort: attemptEffort };
+      this.autoTier[cacheKey] = chosen;
+      try {
+        writeGlobalConfig({
+          [`${tier}_provider`]: candidate.provider,
+          [`${tier}_model`]: candidate.model,
+          [`${tier}_auto`]: true,
+        });
+      } catch { /* read-only home: keep the in-memory choice */ }
+      this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model} @ ${attemptEffort ?? '(none)'}`);
+      return chosen;
     }
     this.ctx?.logger?.warn?.(`dsh-adapter: no usable ${tier} route; keeping ${bound.provider}/${bound.model}`);
     return { binding: bound, effort };
@@ -643,8 +680,18 @@ export async function apply(ctx) {
           const providers = [];
           for (const p of ctx.llm.listProviders()) {
             let models = [];
+            const modelInfo = {};
             try { models = (await ctx.llm.listModels(p.id)).map((m) => m.id); } catch { /* adapter without a catalog */ }
-            providers.push({ id: p.id, name: p.name ?? p.id, models });
+            for (const id of models) {
+              try {
+                const info = await ctx.llm.resolveModelInfo(p.id, id);
+                modelInfo[id] = {
+                  efforts: (info?.reasoning?.efforts ?? []).map((e) => e.id),
+                  ...(info?.reasoning?.defaultEffort === undefined ? {} : { defaultEffort: info.reasoning.defaultEffort }),
+                };
+              } catch { /* metadata optional */ }
+            }
+            providers.push({ id: p.id, name: p.name ?? p.id, models, model_info: modelInfo });
           }
           return sendJson(res, 200, {
             ok: true,
