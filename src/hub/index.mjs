@@ -12,6 +12,7 @@ import { procAlive, killWorkerProcess, parsePid, ProcKillRefused } from '../proc
 import { installWorkerQuestionHandoff } from '../worker-question.mjs';
 import { appendHistory, backfillHistory, historyStats, readHistory, readHistoryIds } from '../history.mjs';
 import { DEFAULT_STALL_SECONDS, jobProblem, quietSeconds } from '../job-watchdog.mjs';
+import { prepareSandboxTemp } from '../sandbox-temp.mjs';
 
 
 /** One readable line per session event, kept in a small per-job ring so a
@@ -580,6 +581,10 @@ async function readBody(req, limit = 64 * 1024) {
 
 export async function apply(ctx) {
   seedLangFromHost(ctx);
+  // Sandboxed commands need a temp root this user can grant on; fix that
+  // before any worker session exists (see sandbox-temp.mjs).
+  const sandboxTemp = prepareSandboxTemp();
+  ctx.logger?.info?.(`dsh-adapter: sandbox temp ${sandboxTemp.root}${sandboxTemp.switched ? ' (switched: ' + sandboxTemp.reason + ')' : ''}`);
   const hub = new WorkerRegistry(ctx);
   // Providers DSH already has configured are offered to the multimodal bridge
   // as ready-made entries, so a vision model needs no manual base URL or key.
@@ -1030,6 +1035,26 @@ export async function apply(ctx) {
           const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
           const { records, total } = readHistory({ ...filter, limit, offset });
           return sendJson(res, 200, { ok: true, records, total, stats: historyStats(filter) });
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
+        }
+      },
+    }));
+
+
+    disposers.push(webServer.register({
+      kind: 'exact', path: `${ROUTE_BASE}/doctor`,
+      handler: async (req, res) => {
+        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        try {
+          const cfg = hub.getConfig();
+          return sendJson(res, 200, {
+            ok: true,
+            hub_url: cfg.hub_url,
+            mode: cfg.mode,
+            temp: prepareSandboxTemp(),
+            hub_reachable: true,
+          });
         } catch (err) {
           return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
         }

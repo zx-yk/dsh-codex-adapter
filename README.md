@@ -222,6 +222,7 @@ The MCP server is a thin client: it holds no model credentials and never calls a
 - **Codex desktop does not see the tools** — restart the client after installing; also check that the global MCP toggle is on (Settings &rarr; Integrations).
 - **A worker seems stuck** — the board shows `stalled` after 120s without an event, and the hub fails the job after `stall_timeout_seconds` (default 600s), releasing the workspace lock. PTC's `run_code` is the usual suspect: its workflow disables the runtime deadline.
 - **A dispatch fails with an unsupported effort** — run `npm run caps:sync` against the profile; the local dictionary may be older than the provider's catalog.
+- **Windows: every command fails with `SetNamedSecurityInfoW failed (Win32 5)`** — the system temp root cannot inherit your full control (common when TEMP was moved). The plugin detects this at startup and points TMP/TEMP at `%LOCALAPPDATA%\dsh-adapter\temp`; `GET /_dsh/dsh-adapter/doctor` reports the chosen root. No manual ACL change is needed.
 - **Standalone messages** — `standalone` is a source-checkout mode. In an installed plugin the message tells you to run workers inside DSH instead of suggesting a package install.
 
 ## Development

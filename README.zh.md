@@ -217,6 +217,7 @@ MCP server 只是一个瘦客户端：在 hub 模式下它不持有模型凭据�
 - **Codex 桌面端看不到工具**：装完后重启客户端；同时确认全局 MCP 开关是开的（设置 → 集成）。
 - **worker 疑似卡住**：看板在 120 秒无事件后显示“疑似卡住”，hub 在 `stall_timeout_seconds`（默认 600 秒）后判失败并释放工作区锁。PTC 的 `run_code` 是常见原因：它的 workflow 关闭了运行时超时。
 - **派发报推理强度不支持**：对 profile 跑一次 `npm run caps:sync`，本地字典可能落后于上游。
+- **Windows 下所有命令都报 `SetNamedSecurityInfoW failed (Win32 5)`**：系统临时目录不能让当前用户继承完全控制（TEMP 被改到别处时常见）。插件启动时会检测并把自己的 `TMP`/`TEMP` 指向 `%LOCALAPPDATA%\dsh-adapter\temp`，`GET /_dsh/dsh-adapter/doctor` 会显示实际使用的目录，无需手动改权限。
 - **standalone 相关提示**：`standalone` 只适用于源码 checkout；安装版会明确提示“在 DSH 内运行”，而不是让你去装包。
 
 ## 开发
