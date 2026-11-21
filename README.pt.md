@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>Um plugin do <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: envie trabalho para agentes DSH a partir do Claude Code / Codex / Antigravity / Grok, sem abrir mão da UI nativa de subagent do host.</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — página de configurações" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — página de configurações" width="100%" />
 </p>
 <p align="center"><sub>A página de configurações do DSH Adapter — integrações do host, política de despacho, execução e a ponte multimodal</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, mantém o próprio model
 O despacho se espalha. Abaixo, dezoito workers traduzem este README em paralelo: o host os conta como seus próprios subagents, enquanto o harness os executa como sessões reais.
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>No Claude Code, os workers do dsh-adapter são subagents nativos; o segmento da statusline acompanha os tiers em execução, o tempo decorrido e os tokens.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>O painel do DSH Adapter mostra a mesma execução pelo lado do harness: qual host despachou cada job, seu tier e effort, o progresso ao vivo e o uso de tokens.</sub></p>
 

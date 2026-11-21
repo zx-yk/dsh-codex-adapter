@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>Bir <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> eklentisi: Claude Code / Codex / Antigravity / Grok'tan DSH ajanlarına iş gönderin; host'un yerel subagent arayüzünden vazgeçmeden.</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — ayarlar sayfası" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — ayarlar sayfası" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter ayarlar sayfası — host entegrasyonları, gönderim politikası, yürütme ve multimodal köprü</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Dağıtım yatayda büyür. Aşağıda on sekiz worker bu README'yi paralel olarak çeviriyor: host onları kendi subagent'ları olarak sayarken, harness onları gerçek oturumlar olarak çalıştırır.
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Claude Code'da dsh-adapter worker'ları yerel subagent olarak görünür; statusline bölümü çalışan tier'ları, geçen süreyi ve token'ları gösterir.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter paneli aynı çalışmayı harness tarafından gösterir: her işi hangi host gönderdi, tier ve effort değerleri, canlı ilerleme ve token kullanımı.</sub></p>
 

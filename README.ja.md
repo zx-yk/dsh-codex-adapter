@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong><a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> プラグイン: Claude Code / Codex / Antigravity / Grok から DSH エージェントへ作業をディスパッチします。ホスト本来の subagent UI はそのままです。</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter 設定ページ" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter 設定ページ" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter 設定ページ — ホスト連携、ディスパッチポリシー、実行、マルチモーダルブリッジ</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 ディスパッチは横に広がります。下の例では 18 個の worker がこの README を並行翻訳しています。ホストはそれらを自身のサブエージェントとして数え、harness は実際のセッションとして実行します。
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Claude Code から見ると、dsh-adapter の worker はネイティブなサブエージェントです。statusline セグメントが実行中の tier・経過時間・トークンを表示します。</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter パネルから見た同じ実行: どのホストが各ジョブをディスパッチしたか、tier と effort、進捗とトークン使用量。</sub></p>
 

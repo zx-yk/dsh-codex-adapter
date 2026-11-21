@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong><a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> plugin: Claude Code / Codex / Antigravity / Grok에서 DSH agent로 작업을 dispatch하며, 호스트의 native subagent UI는 그대로 유지합니다.</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — 설정 페이지" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — 설정 페이지" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter 설정 페이지 — 호스트 통합, 디스패치 정책, 실행 및 멀티모달 브리지</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 디스패치는 넓게 펼칠 수 있습니다. 아래에서는 18개의 worker가 이 README를 병렬로 번역합니다. 호스트는 이들을 자신의 서브에이전트로 세고, harness는 실제 세션으로 실행합니다.
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Claude Code에서 dsh-adapter worker는 네이티브 서브에이전트로 보입니다. statusline 세그먼트가 실행 중인 tier, 경과 시간, 토큰을 표시합니다.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter 패널에서 본 같은 실행: 각 작업을 디스패치한 호스트, tier와 effort, 실시간 진행 상황과 토큰 사용량.</sub></p>
 

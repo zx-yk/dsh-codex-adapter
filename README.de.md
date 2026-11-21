@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>Ein <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>-Plugin: Verteilen Sie Arbeit von Claude Code / Codex / Antigravity / Grok aus an DSH-Agenten, ohne auf die native Subagent-UI des Hosts zu verzichten.</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — Einstellungsseite" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — Einstellungsseite" width="100%" />
 </p>
 <p align="center"><sub>Die Einstellungsseite von DSH Adapter — Host-Integrationen, Dispatch-Richtlinie, Ausführung und die multimodale Brücke</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Dispatch lässt sich breit auffächern. Unten übersetzen achtzehn Worker dieses README parallel: Der Host zählt sie als eigene Subagenten, während das Harness sie als echte Sessions ausführt.
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Claude Code sieht dsh-adapter-Worker als native Subagenten; das Statusline-Segment zeigt laufende Tiers, verstrichene Zeit und Tokens.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>Das DSH-Adapter-Panel zeigt denselben Lauf von der Harness-Seite: welcher Host welchen Job gestartet hat, Tier und Effort, Fortschritt und Tokenverbrauch.</sub></p>
 

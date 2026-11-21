@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>एक <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> प्लगइन: Claude Code / Codex / Antigravity / Grok से DSH एजेंटों में काम भेजें, बिना होस्ट के नेटिव सबएजेंट UI को छोड़े।</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter सेटिंग्स पेज - होस्ट इंटीग्रेशन, डिस्पैच पॉलिसी, निष्पादन और मल्टीमोडल ब्रिज</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 डिस्पैच चौड़ाई में फैलता है। नीचे अठारह worker इस README का समानांतर अनुवाद कर रहे हैं: होस्ट उन्हें अपने subagent गिनता है, जबकि harness उन्हें असली session के रूप में चलाता है।
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Claude Code में dsh-adapter के worker नेटिव subagent दिखते हैं; statusline सेगमेंट चल रहे tier, बीता समय और token दिखाता है।</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter पैनल वही रन harness की तरफ़ से दिखाता है: कौन-सा होस्ट किस job को भेजा, उसका tier और effort, लाइव प्रगति और token खपत।</sub></p>
 

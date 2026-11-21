@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>Một plugin của <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: điều phối công việc tới các DSH agent từ Claude Code / Codex / Antigravity / Grok mà không phải từ bỏ UI subagent gốc của host.</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
 <p align="center"><sub>Trang cài đặt DSH Adapter — tích hợp host, chính sách điều phối, thực thi và cầu nối đa phương thức</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 Việc dispatch có thể trải rộng. Bên dưới, mười tám worker dịch song song tài liệu README này: host đếm chúng như subagent của chính nó, còn harness chạy chúng như những phiên thực sự.
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Trong Claude Code, worker của dsh-adapter hiện ra như subagent gốc; đoạn statusline theo dõi tier đang chạy, thời gian trôi qua và token.</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>Bảng DSH Adapter nhìn cùng lần chạy đó từ phía harness: host nào đã gửi mỗi job, tier và effort của nó, tiến độ trực tiếp và lượng token.</sub></p>
 

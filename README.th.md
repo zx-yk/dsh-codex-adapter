@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>ปลั๊กอินสำหรับ <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: ส่งงานให้ DSH agents จาก Claude Code / Codex / Antigravity / Grok โดยไม่ต้องสละ subagent UI ดั้งเดิมของโฮสต์</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
 <p align="center"><sub>หน้า settings ของ DSH Adapter — การเชื่อมต่อโฮสต์ นโยบายการส่งงาน การทำงาน และสะพาน multimodal</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 การ dispatch ขยายออกได้กว้าง ด้านล่างมี worker สิบแปดตัวแปล README นี้พร้อมกัน: ฝั่ง host นับพวกมันเป็น subagent ของตัวเอง ส่วน harness รันพวกมันเป็นเซสชันจริง
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>ใน Claude Code worker ของ dsh-adapter ปรากฏเป็น subagent ดั้งเดิม และส่วน statusline แสดง tier ที่กำลังทำงาน เวลาที่ใช้ และ token</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>แผง DSH Adapter แสดงการรันเดียวกันจากฝั่ง harness: host ใดส่งงานไหน tier และ effort ความคืบหน้าแบบเรียลไทม์ และการใช้ token</sub></p>
 

@@ -3,6 +3,8 @@
 </p>
 
 <h1 align="center">DSH Adapter</h1>
+> **Note:** this translation may lag behind the English README. Current behaviour: hub-only dispatch by default. See [README.md](./README.md).
+
 
 <p align="center">
   <strong>一個 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 外掛程式：從 Claude Code / Codex / Antigravity / Grok 分派工作給 DSH 代理，而不放棄主機的原生 subagent UI。</strong><br />
@@ -24,7 +26,7 @@
 <br />
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-overview.png" alt="DSH Adapter — settings page" width="100%" />
+  <img src="./docs/images/settings-dispatch.png" alt="DSH Adapter — settings page" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter 設定頁面 — 主機整合、分派策略、執行與多模態橋接</sub></p>
 
@@ -118,12 +120,12 @@ Claude Code / Codex / Antigravity / Grok（協調器，保留自己的模型）
 分派是可以鋪開的。下面這次，18 個 worker 並行翻譯這份 README：宿主把它們算作自己的子代理，harness 則把它們當作真實工作階段來跑。
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-host.png" alt="Claude Code" width="100%" />
+  <img src="./docs/images/settings-integrations.png" alt="Claude Code" width="100%" />
 </p>
 <p align="center"><sub>Claude Code 裡，dsh-adapter worker 就是原生子代理；狀態列區段即時顯示執行中的 tier、耗時與 token。</sub></p>
 
 <p align="center">
-  <img src="./docs/images/dsh-adapter-jobs.png" alt="DSH Adapter" width="100%" />
+  <img src="./docs/images/settings-history.png" alt="DSH Adapter" width="100%" />
 </p>
 <p align="center"><sub>DSH Adapter 面板從 harness 一側看同一次執行：每個任務由哪個宿主分派、tier 與 effort、即時進度與 token 用量。</sub></p>
 
