@@ -81,6 +81,9 @@ export const GLOBAL_CONFIG_DEFAULTS = {
   // silent standalone fallback can only fail. Users who want it opt in.
   mode: 'hub',
   default_timeout_seconds: 1800,
+  // Hub jobs are failed when the session emits no event for this long; a
+  // tool path that awaits forever must not hold a workspace indefinitely.
+  stall_timeout_seconds: 600,
   hub_url: 'http://127.0.0.1:3080',
   // auto = orchestrator picks the tier; flash-only / pro-only clamp every
   // dispatch to one tier at the tool layer regardless of what was requested.

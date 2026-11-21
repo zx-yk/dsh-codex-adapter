@@ -11,6 +11,7 @@ import { createShardWriter, readMergedStatus } from '../status-shard.mjs';
 import { procAlive, killWorkerProcess, parsePid, ProcKillRefused } from '../proc-kill.mjs';
 import { installWorkerQuestionHandoff } from '../worker-question.mjs';
 import { appendHistory, backfillHistory, historyStats, readHistory, readHistoryIds } from '../history.mjs';
+import { DEFAULT_STALL_SECONDS, jobProblem, quietSeconds } from '../job-watchdog.mjs';
 
 const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled']);
 import { probeProvider } from '../provider-probe.mjs';
@@ -114,6 +115,8 @@ export class WorkerRegistry {
       cwd: job.cwd, turn: job.turn, step: job.step, currentTool: job.currentTool,
       toolCalls: job.toolCalls, tokens: job.tokens, mode: 'hub',
       startedAt: job.startedAt, endedAt: job.endedAt,
+      lastEventAt: job.lastEventAt ?? null, timeoutSeconds: job.timeoutSeconds ?? null,
+      deadlineAt: job.deadlineAt ?? null, staleSeconds: quietSeconds(job),
       ...(job.questions === undefined ? {} : { questions: job.questions }),
     };
     if (withResult) {
@@ -265,7 +268,7 @@ export class WorkerRegistry {
     return { binding: bound, effort };
   }
 
-  async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset }) {
+  async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset, timeout_seconds }) {
     if (!TIERS.includes(tier)) throw new Error(`unknown tier "${tier}"`);
     // An explicit {provider, model} from the caller wins (the MCP process owns
     // session-level overrides, exactly as it does for presets); otherwise the
@@ -299,11 +302,16 @@ export class WorkerRegistry {
 
     const id = `hub-${this.nextId++}-${Date.now().toString(36)}`;
     const sessionId = `session-${randomUUID()}`;
+    const timeoutSec = Number(timeout_seconds) > 0
+      ? Number(timeout_seconds)
+      : (Number(this.getConfig?.().default_timeout_seconds) || 1800);
+    const startedAt = new Date().toISOString();
     const job = {
       id, sessionId, tier, model: resolvedModel, provider: resolvedProvider, effort: dispatchEffort, task, source, cwd: cwdPath,
       status: 'running', turn: 0, step: 0, currentTool: null, toolCalls: 0,
       tokens: { input: 0, output: 0, reasoning: 0 },
-      startedAt: new Date().toISOString(), endedAt: null,
+      startedAt, endedAt: null, lastEventAt: startedAt, timeoutSeconds: timeoutSec,
+      deadlineAt: new Date(Date.now() + timeoutSec * 1000).toISOString(),
       result: null, error: null, stopReason: null, handle: null, waiters: [],
       texts: [],
     };
@@ -318,6 +326,7 @@ export class WorkerRegistry {
       : (await presets.resolve(!wanted || wanted === 'default' ? undefined : wanted)).id;
 
     const onEvent = (session, event) => {
+      job.lastEventAt = new Date().toISOString();
       switch (event.type) {
         case 'step/start':
           job.turn = event.data?.turn ?? job.turn;
@@ -384,7 +393,7 @@ export class WorkerRegistry {
       await handle.agent.whenIdle();
       handle.agent.followup(userMessage(task));
       await handle.agent.whenIdle();
-      if (job.status !== 'needs_input') {
+      if (job.status === 'running') {
         job.result = job.texts.at(-1) ?? '';
         job.status = job.stopReason === 'completed' ? 'done' : 'failed';
       }
@@ -405,7 +414,31 @@ export class WorkerRegistry {
       });
 
     this.publish();
+    this.startWatchdog();
     return job;
+  }
+
+  /** One interval for every job in this process; cheap and unref'd. */
+  startWatchdog() {
+    if (this.watchdog) return;
+    this.watchdog = setInterval(() => this.sweepStalled(), 30_000);
+    this.watchdog.unref?.();
+  }
+
+  sweepStalled() {
+    const stall = Number(this.getConfig?.().stall_timeout_seconds) > 0
+      ? Number(this.getConfig().stall_timeout_seconds)
+      : DEFAULT_STALL_SECONDS;
+    const now = Date.now();
+    for (const job of this.jobs.values()) {
+      const problem = jobProblem(job, now, stall);
+      if (!problem) continue;
+      job.status = 'failed';
+      job.error = problem.reason;
+      try { job.handle?.dispose?.(); } catch { /* already gone */ }
+      this.publish();
+      for (const w of job.waiters.splice(0)) w();
+    }
   }
 
   async wait(id, timeoutMs) {
@@ -432,6 +465,7 @@ export class WorkerRegistry {
   }
 
   async dispose() {
+    if (this.watchdog) { clearInterval(this.watchdog); this.watchdog = undefined; }
     for (const job of this.jobs.values()) {
       if (job.status === 'running') { try { await job.handle?.dispose(); } catch {} }
     }

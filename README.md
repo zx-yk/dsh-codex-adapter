@@ -158,7 +158,8 @@ npm run caps:sync -- --provider <id> --write   # write them into the DSH profile
 | `mode` | `hub` | `hub` requires DSH; `auto` falls back to standalone; `standalone` never uses the hub |
 | `default_tier` | `flash` | Tier used when a dispatch does not name one |
 | `default_effort` | `high` | `off` / `high` / `max` |
-| `default_timeout_seconds` | `1800` | Per-task cap |
+| `default_timeout_seconds` | `1800` | Per-task cap (enforced by the hub) |
+| `stall_timeout_seconds` | `600` | Fail a hub job that emits no session event for this long |
 | `tier_policy` | `auto` | `flash-only` / `pro-only` clamp every dispatch |
 | `escalate_on_failure` | `false` | Retry a failed flash run once on pro |
 | `preset_flash` / `preset_pro` | `default` | Agent preset mounted for hub workers |
@@ -207,6 +208,7 @@ The MCP server is a thin client: it holds no model credentials and never calls a
 - **DSH must be running.** Dispatch is hub-only by default; the packaged plugin ships neither the DSH SDK nor the worker runtime, so it cannot run a worker on its own.
 - **"hub not reachable"** — start DSH, or check that `hub_url` matches the current port. The host rewrites it on launch, and the MCP client re-reads it on every call since 0.1.19.
 - **Codex desktop does not see the tools** — restart the client after installing; also check that the global MCP toggle is on (Settings &rarr; Integrations).
+- **A worker seems stuck** — the board shows `stalled` after 120s without an event, and the hub fails the job after `stall_timeout_seconds` (default 600s), releasing the workspace lock. PTC's `run_code` is the usual suspect: its workflow disables the runtime deadline.
 - **A dispatch fails with an unsupported effort** — run `npm run caps:sync` against the profile; the local dictionary may be older than the provider's catalog.
 - **Standalone messages** — `standalone` is a source-checkout mode. In an installed plugin the message tells you to run workers inside DSH instead of suggesting a package install.
 

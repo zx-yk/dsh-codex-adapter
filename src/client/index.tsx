@@ -157,6 +157,8 @@ const COPY = {
     lockBadgeTip: (h: any) => `「${h?.cwd ?? '此工作区'}」正被运行中任务持锁（job ${h?.jobId} · backend ${h?.backend} · 开始于 ${h?.startedAt}）：对该 cwd 的再次派发会被拒绝，除非传 allow_concurrent_cwd: true。`,
     shardStale: (min: number) => `状态源已 ${min} 分钟没有写入（任务可能已无输出地卡住，或所属进程已死但状态源尚未清理）`,
     stalledTip: (last: string) => last ? `超过 120 秒无输出（上次输出 ${last} 前），进程仍存活；长时间工具调用可能误报` : '超过 120 秒无输出，进程仍存活；长时间工具调用可能误报',
+    quiet: (d: string) => `静默 ${d}`,
+    quietTip: (tool: string) => `超过 120 秒没有新事件${tool ? `（最后工具：${tool}）` : ''}；无进度超过 stall_timeout_seconds 后会被自动判为失败`,
     col: { id: '任务', source: '来源', tier: '档位', status: '状态', progress: '进度', tokens: 'tokens ⇅', task: '内容' },
     working: '处理中…',
     tips: {
@@ -256,6 +258,8 @@ const COPY = {
     lockBadgeTip: (h: any) => `"${h?.cwd ?? 'this workspace'}" is held by a running job (job ${h?.jobId} · backend ${h?.backend} · started ${h?.startedAt}): a second dispatch to this cwd is refused unless allow_concurrent_cwd: true is passed.`,
     shardStale: (min: number) => `status feed has not been written for ${min} min (job may be stuck with no output, or its process died but the feed was not cleaned up yet)`,
     stalledTip: (last: string) => last ? `No output for 120s (last output ${last} ago); the process is still alive — long tool runs can false-positive` : 'No output for 120s; the process is still alive — long tool runs can false-positive',
+    quiet: (d: string) => `quiet ${d}`,
+    quietTip: (tool: string) => `No new session event for 120s${tool ? ` (last tool: ${tool})` : ''}; jobs with no progress beyond stall_timeout_seconds are failed automatically`,
     col: { id: 'job', source: 'source', tier: 'tier', status: 'status', progress: 'progress', tokens: 'tokens ⇅', task: 'task' },
     working: 'Working…',
     tips: {
@@ -775,6 +779,11 @@ function WorkersPanel({ ctx }: { ctx: any }) {
             title={job.currentTool ? `${info.title} · ${job.currentTool}` : info.title}>
             <span style={{ color: info.color, cursor: 'default' }}>●</span>
             <span style={{ fontSize: 11, color: info.color, whiteSpace: 'nowrap' }}>{info.label}</span>
+            {job.status === 'running' && (job.staleSeconds ?? 0) >= 120 && (
+              <span title={copy.quietTip(job.currentTool ?? '')} style={{ fontSize: 10.5, color: '#f0883e', whiteSpace: 'nowrap' }}>
+                {copy.quiet(job.staleSeconds >= 60 ? `${Math.round(job.staleSeconds / 60)}m` : `${job.staleSeconds}s`)}
+              </span>
+            )}
             {ghostRow && (
               <button type="button" title={copy.orphanDismiss} aria-label={copy.orphanDismiss}
                 style={{ border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 12, padding: 0, opacity: 0.55, lineHeight: 1 }}

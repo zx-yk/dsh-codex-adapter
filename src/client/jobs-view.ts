@@ -147,6 +147,11 @@ export function statusInfoOf(job: any, copy: any): { color: string; label: strin
     };
   }
   if (st === 'running') {
+    // Hub jobs carry staleSeconds; a session that emits no event for two
+    // minutes is worth flagging even before the watchdog fails it.
+    if ((job.staleSeconds ?? 0) >= 120) {
+      return { color: '#d29922', label: copy.statusStalled, title: copy.quietTip(job.currentTool ?? '') };
+    }
     if (job.liveness === 'stalled') {
       const last = job.activityLastEventAt ? timeAgo(job.activityLastEventAt) : '';
       return { color: '#d29922', label: copy.statusStalled, title: copy.stalledTip(last) };

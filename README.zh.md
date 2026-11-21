@@ -155,7 +155,8 @@ npm run caps:sync -- --provider <id> --write   # 写入 DSH profile
 | `mode` | `hub` | `hub` 要求 DSH；`auto` 可回落独立进程；`standalone` 永不使用 hub |
 | `default_tier` | `flash` | 未指定档位时使用 |
 | `default_effort` | `high` | `off` / `high` / `max` |
-| `default_timeout_seconds` | `1800` | 单任务上限 |
+| `default_timeout_seconds` | `1800` | 单任务上限（由 hub 强制执行） |
+| `stall_timeout_seconds` | `600` | hub 任务超过该时长没有任何会话事件即判失败 |
 | `tier_policy` | `auto` | `flash-only` / `pro-only` 强制约束所有派发 |
 | `escalate_on_failure` | `false` | flash 失败后自动用 pro 重试一次 |
 | `preset_flash` / `preset_pro` | `default` | hub worker 挂载的 Agent 预设 |
@@ -204,6 +205,7 @@ MCP server 只是一个瘦客户端：在 hub 模式下它不持有模型凭据�
 - **DSH 必须在运行。** 派发默认 hub-only；打包插件既不带 DSH SDK 也不带 worker runtime，无法自行运行 worker。
 - **提示 “hub not reachable”**：启动 DSH，或确认 `hub_url` 与当前端口一致。宿主启动时会重写它，MCP 客户端从 0.1.19 起每次调用都会重新读取。
 - **Codex 桌面端看不到工具**：装完后重启客户端；同时确认全局 MCP 开关是开的（设置 → 集成）。
+- **worker 疑似卡住**：看板在 120 秒无事件后显示“疑似卡住”，hub 在 `stall_timeout_seconds`（默认 600 秒）后判失败并释放工作区锁。PTC 的 `run_code` 是常见原因：它的 workflow 关闭了运行时超时。
 - **派发报推理强度不支持**：对 profile 跑一次 `npm run caps:sync`，本地字典可能落后于上游。
 - **standalone 相关提示**：`standalone` 只适用于源码 checkout；安装版会明确提示“在 DSH 内运行”，而不是让你去装包。
 
