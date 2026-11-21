@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zseven-w/dsh-crew</code> &middot; 현재 plugin 릴리스: <code>0.1.0-rc.11</code> &middot; DSH <code>0.1.1-rc.1</code>에서 테스트됨</sub>
+  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; 현재 plugin 릴리스: <code>0.1.0-rc.11</code> &middot; DSH <code>0.1.1-rc.1</code>에서 테스트됨</sub>
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 npm에서 DSH 프로필로 설치:
 
 ```bash
-dsh plugin --profile web add @zseven-w/dsh-crew@latest
+dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
 dsh web
 ```
 

@@ -5,12 +5,16 @@
 <h1 align="center">DSH Crew</h1>
 
 <p align="center">
+  <sub>Independent fork of <a href="https://github.com/ZSeven-W/dsh-crew">dsh-crew</a> (MIT) &mdash; see <a href="./NOTICE">NOTICE</a>.</sub>
+</p>
+
+<p align="center">
   <strong>A <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> plugin: dispatch work to DSH agents from Claude Code / Codex / Antigravity / Grok, without giving up the host's native subagent UI.</strong><br />
   <sub>Native Progress UI &bull; Tier Policy &amp; Escalation &bull; Dispatch Guardrails &bull; Jobs Board &bull; In-Host DSH Sessions &bull; Vision &amp; Image Gen (Native-First) &bull; One-Click Install</sub>
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zseven-w/dsh-crew</code> &middot; Current plugin release: <code>0.1.0-rc.11</code> &middot; Tested with DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; Current plugin release: <code>0.1.0-rc.11</code> &middot; Tested with DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
@@ -134,7 +138,7 @@ Dispatch fans out. Below, eighteen workers translate this README in parallel: th
 Install into a DSH profile from npm:
 
 ```bash
-dsh plugin --profile web add @zseven-w/dsh-crew@latest
+dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
 dsh web
 ```
 

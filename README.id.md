@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zseven-w/dsh-crew</code> &middot; Rilis plugin saat ini: <code>0.1.0-rc.11</code> &middot; Diuji dengan DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; Rilis plugin saat ini: <code>0.1.0-rc.11</code> &middot; Diuji dengan DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ Dispatch bisa melebar. Di bawah ini delapan belas worker menerjemahkan README in
 Pasang dari npm ke sebuah profil DSH:
 
 ```bash
-dsh plugin --profile web add @zseven-w/dsh-crew@latest
+dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
 dsh web
 ```
 

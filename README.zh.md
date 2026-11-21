@@ -5,12 +5,16 @@
 <h1 align="center">DSH Crew</h1>
 
 <p align="center">
+  <sub><a href="https://github.com/ZSeven-W/dsh-crew">dsh-crew</a>（MIT）的独立分支 &mdash; 见 <a href="./NOTICE">NOTICE</a>。</sub>
+</p>
+
+<p align="center">
   <strong><a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 插件：在 Claude Code / Codex / Antigravity / Grok 里把活派给 DSH agent，同时保留宿主原生的子代理界面。</strong><br />
   <sub>原生进度 UI &bull; 档位策略与失败升档 &bull; 派发护栏 &bull; 任务看板 &bull; DSH 会话进宿主 &bull; 原生优先视觉与生图 &bull; 一键安装</sub>
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zseven-w/dsh-crew</code> &middot; 当前插件版本: <code>0.1.0-rc.11</code> &middot; 已在 DSH <code>0.1.1-rc.1</code> 验证</sub>
+  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; 当前插件版本: <code>0.1.0-rc.11</code> &middot; 已在 DSH <code>0.1.1-rc.1</code> 验证</sub>
 </p>
 
 <p align="center">
@@ -134,7 +138,7 @@ Claude Code / Codex / Antigravity / Grok（orchestrator，模型不变）
 从 npm 装进 DSH profile：
 
 ```bash
-dsh plugin --profile web add @zseven-w/dsh-crew@latest
+dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
 dsh web
 ```
 

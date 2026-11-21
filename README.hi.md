@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zseven-w/dsh-crew</code> &middot; वर्तमान प्लगइन रिलीज: <code>0.1.0-rc.11</code> &middot; DSH <code>0.1.1-rc.1</code> के साथ परीक्षित</sub>
+  <sub>npm: <code>@zx-yk/dsh-codex-adapter</code> &middot; वर्तमान प्लगइन रिलीज: <code>0.1.0-rc.11</code> &middot; DSH <code>0.1.1-rc.1</code> के साथ परीक्षित</sub>
 </p>
 
 <p align="center">
@@ -134,7 +134,7 @@ Claude Code / Codex / Antigravity / Grok (orchestrator, keeps its own model)
 npm से DSH प्रोफ़ाइल में इंस्टॉल करें:
 
 ```bash
-dsh plugin --profile web add @zseven-w/dsh-crew@latest
+dsh plugin --profile web add @zx-yk/dsh-codex-adapter@latest
 dsh web
 ```
 

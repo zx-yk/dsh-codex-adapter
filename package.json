@@ -1,5 +1,5 @@
 {
-  "name": "@zseven-w/dsh-crew",
+  "name": "@zx-yk/dsh-codex-adapter",
   "version": "0.1.0-rc.15",
   "type": "module",
   "main": "./src/hub/index.mjs",
@@ -43,7 +43,7 @@
     "react-dom": "^18.0.0"
   },
   "dshHostRuntime": {
-    "_comment": "Documentation only - these @deepseek-ai/* packages are provided by the DSH HOST at runtime (worker.cordis.yml composition + host profile), never by this package. They were peerDependencies in <=0.1.0-rc.2, but npm 7+ auto-installs peers (optional ones included when placeable), and the pinned versions ERESOLVE against the host newer transitive tree (issue #3): a plain npm install of @zseven-w/dsh-crew failed. Keep these pins in sync with the DSH version this release is tested against (README badge).",
+    "_comment": "Documentation only - these @deepseek-ai/* packages are provided by the DSH HOST at runtime (worker.cordis.yml composition + host profile), never by this package. They were peerDependencies in <=0.1.0-rc.2, but npm 7+ auto-installs peers (optional ones included when placeable), and the pinned versions ERESOLVE against the host newer transitive tree (issue #3): a plain npm install of @zx-yk/dsh-codex-adapter failed. Keep these pins in sync with the DSH version this release is tested against (README badge).",
     "@deepseek-ai/dsh-agent": "0.1.0-rc.6",
     "@deepseek-ai/dsh-agent-presets": "0.1.0-rc.6",
     "@deepseek-ai/dsh-agent-spine-demo": "0.1.0-rc.6",
@@ -94,10 +94,11 @@
     "typescript": "^5.6.0"
   },
   "license": "MIT",
+  "author": "zx-yk",
   "packageManager": "pnpm@11.21.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ZSeven-W/dsh-crew.git"
+    "url": "git+https://github.com/zx-yk/dsh-codex-adapter.git"
   },
   "keywords": [
     "dsh",

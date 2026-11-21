@@ -1,0 +1,33 @@
+dsh-codex-adapter
+=================
+
+This project is an independent derivative of dsh-crew.
+
+  Upstream project:  https://github.com/ZSeven-W/dsh-crew
+  Starting version:  0.1.0-rc.15 (commit b00cc6d)
+  Upstream license:  MIT — see LICENSE (kept unmodified)
+  Upstream holder:   Copyright (c) 2026 ZSeven-W
+
+Modifications in this repository: Copyright (c) 2026 zx-yk, released under the
+same MIT License.
+
+Why this file exists
+--------------------
+The MIT License requires that the copyright notice and the permission notice be
+included in all copies or substantial portions of the Software. Keeping the
+original LICENSE text and recording the upstream origin here satisfies that
+requirement and makes the provenance of the code explicit.
+
+Trademarks and endorsement
+--------------------------
+The MIT License grants copyright and patent permissions only; it grants no
+trademark rights. The names "dsh-crew", "DSH Crew" and "ZSeven-W" are used here
+solely to describe the origin of this code (factual attribution). This project
+is not affiliated with, endorsed by, or sponsored by the upstream authors, and
+no upstream logo or branding is claimed as a mark of this project.
+
+Third-party assets
+------------------
+Files under docs/images/ originate from the upstream repository and remain
+subject to the upstream MIT license. Replace them before publishing this fork
+under a distinct brand.
