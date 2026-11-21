@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MARKETPLACE_NAME = 'dsh-adapter';
 const PLUGIN_KEY = `dsh-adapter@${MARKETPLACE_NAME}`;
-const MCP_TOOLS = ['dsh_run_worker', 'dsh_spawn_worker', 'dsh_worker_status', 'dsh_worker_result', 'dsh_worker_cancel'];
+const MCP_TOOLS = ['dsh_run_worker', 'dsh_spawn_worker', 'dsh_worker_status', 'dsh_worker_result', 'dsh_worker_watch', 'dsh_worker_cancel', 'dsh_worker_config', 'dsh_worker_probe'];
 
 function backup(file) {
   if (existsSync(file)) {

@@ -27,6 +27,7 @@ const EXPECTED_TOOLS = [
   'dsh_spawn_worker',
   'dsh_worker_status',
   'dsh_worker_result',
+  'dsh_worker_watch',
   'dsh_worker_cancel',
 ];
 

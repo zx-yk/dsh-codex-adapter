@@ -12,7 +12,7 @@ import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks
 import { resolveWorkerCwd } from './paths.mjs';
 import { detectOrchestrator } from './process-info.mjs';
 
-const server = new McpServer({ name: 'dsh-adapter', version: '0.1.24' });
+const server = new McpServer({ name: 'dsh-adapter', version: '0.1.25' });
 
 const tierSchema = z.enum(['flash', 'pro']).optional().describe('Worker model tier. flash = mechanical, well-scoped work (single-file edits, lookups, formatting); pro = multi-file changes, debugging, design judgment. Omit to use the session default. Ignored when worker= is set.');
 const effortSchema = z.enum(['off', 'high', 'max']).optional().describe('Reasoning effort for the worker. Omit to use the session default. With worker= it only applies when passed explicitly and the profile supports it (agy maps to low/medium/high).');
@@ -426,6 +426,24 @@ server.registerTool('dsh_worker_result', {
   if (!getJob(job_id)) return text({ error: `no such job: ${job_id}` });
   const job = await waitJob(job_id, wait_seconds > 0 ? wait_seconds * 1000 : 1);
   return text(jobView(job, { withResult: true }));
+});
+
+
+server.registerTool('dsh_worker_watch', {
+  title: 'Follow a DSH worker live',
+  description: 'Return the next slice of a running worker live events: tool calls (with their arguments), tool results, assistant text, step boundaries, as they happen. Call it repeatedly with the returned cursor to narrate real progress to the user instead of guessing. Blocks up to wait_seconds while waiting for something to happen. Hub mode only.',
+  inputSchema: {
+    job_id: z.string(),
+    after: z.number().int().min(0).default(0).describe('Cursor from the previous response; 0 starts from the earliest retained event'),
+    wait_seconds: z.number().int().min(0).max(120).default(30).describe('How long to wait for new events before returning an empty slice'),
+  },
+}, async ({ job_id, after, wait_seconds }) => {
+  if (!(await hubAvailable())) return text({ error: 'hub not reachable; live events are only available in hub mode' });
+  try {
+    return text(await hub.events(job_id, after, wait_seconds));
+  } catch (err) {
+    return text({ error: err?.message ?? String(err) });
+  }
 });
 
 server.registerTool('dsh_worker_cancel', {

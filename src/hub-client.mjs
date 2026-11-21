@@ -77,4 +77,9 @@ export const hub = {
     }
   },
   cancel: (id) => call(`/jobs/${id}/cancel`, { method: 'POST' }).then((b) => b.job),
+  // Incremental live events: tool calls, results and assistant text. Served by
+  // a short server-side long-poll so a caller can follow a job cheaply.
+  events: (id, after = 0, waitSeconds = 0) => call(
+    `/jobs/${id}/events?after=${Math.max(0, Number(after) || 0)}&wait=${Math.max(0, Math.min(300, Number(waitSeconds) || 0))}`,
+  ),
 };

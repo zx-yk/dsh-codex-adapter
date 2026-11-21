@@ -107,6 +107,17 @@ Use dsh_run_worker to fix the failing test in D:/repo, tier pro,
 cwd D:/repo, timeout 900. Report the diff and the test output.
 ```
 
+While a job runs, ask Codex to follow it instead of guessing:
+
+```
+Call dsh_worker_watch on hub-1-… with after=<cursor>, wait_seconds=30,
+and tell me each tool call (command included) as it happens.
+```
+
+The tool returns the next slice of live events — tool name, its arguments,
+tool result summary, assistant text and step boundaries — plus a cursor for
+the next call. `dsh_worker_status` also carries the last 12 events per job.
+
 The CLI additionally gets two agent roles:
 
 ```
@@ -131,6 +142,7 @@ The plugin's marketplace entry exposes the same tools. Ask for a worker, or use 
 | `dsh_spawn_worker` | Start a task in the background; returns a job id |
 | `dsh_worker_status` | Live jobs, current tool, tokens, workspace locks |
 | `dsh_worker_result` | Fetch a job's final result, optionally waiting |
+| `dsh_worker_watch` | Follow a running job: new tool calls, arguments, results and assistant text since a cursor |
 | `dsh_worker_cancel` | Cancel a job and release its lock |
 | `dsh_worker_config` | Read or change session tier / mode / route / policy |
 | `dsh_worker_probe` | Test one configured provider/model with a tiny request |

@@ -104,6 +104,15 @@
 用 dsh_run_worker 修复 D:/repo 里失败的测试，档位 pro，cwd D:/repo，超时 900，最后贴出 diff 和测试输出。
 ```
 
+任务运行期间，可以让 Codex 持续跟进，而不是靠猜：
+
+```
+用 dsh_worker_watch 跟进 hub-1-…，after=<cursor>，wait_seconds=30，
+每发生一次工具调用（包括执行的命令）就告诉我。
+```
+
+该工具返回下一段实时事件——工具名、参数、结果摘要、助手文本、步骤边界——并给出下一次调用的 cursor。`dsh_worker_status` 也会带上每个任务最近 12 条事件。
+
 CLI 额外得到两个 agent 角色：
 
 ```
@@ -128,6 +137,7 @@ spawn ds-pro 审查 db/migrations 下的迁移并列出风险
 | `dsh_spawn_worker` | 后台启动任务，返回 job id |
 | `dsh_worker_status` | 实时任务、当前工具、token、工作区锁 |
 | `dsh_worker_result` | 取任务最终结果，可等待 |
+| `dsh_worker_watch` | 跟进运行中的任务：按 cursor 返回新的工具调用、参数、结果与助手文本 |
 | `dsh_worker_cancel` | 取消任务并释放锁 |
 | `dsh_worker_config` | 读取或修改会话级档位/模式/路由/策略 |
 | `dsh_worker_probe` | 用极小的请求测试某个 provider/model |

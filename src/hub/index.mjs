@@ -13,6 +13,31 @@ import { installWorkerQuestionHandoff } from '../worker-question.mjs';
 import { appendHistory, backfillHistory, historyStats, readHistory, readHistoryIds } from '../history.mjs';
 import { DEFAULT_STALL_SECONDS, jobProblem, quietSeconds } from '../job-watchdog.mjs';
 
+
+/** One readable line per session event, kept in a small per-job ring so a
+ *  caller can follow tool calls and commands without reading the transcript. */
+function eventRecord(event, seq) {
+  const at = new Date().toISOString();
+  const clip = (v, n) => (typeof v === 'string' && v.length > n ? v.slice(0, n) + '…' : v);
+  const data = event?.data ?? {};
+  switch (event?.type) {
+    case 'step/start':
+      return { seq, at, kind: 'step', turn: data.turn ?? null, step: data.step ?? null };
+    case 'tool/call':
+      return { seq, at, kind: 'tool', tool: data.name ?? 'tool', detail: clip(JSON.stringify(data.input ?? data.arguments ?? ''), 300) };
+    case 'tool/result':
+      return { seq, at, kind: 'tool-result', tool: data.name ?? null, ok: data.ok ?? null, detail: clip(JSON.stringify(data.result ?? data.error ?? ''), 240) };
+    case 'assistant/message': {
+      const text = (data.message?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join('');
+      return { seq, at, kind: 'text', text: clip(text, 500) };
+    }
+    case 'turn/end':
+      return { seq, at, kind: 'turn-end', reason: data.reason?.kind ?? null };
+    default:
+      return { seq, at, kind: event?.type ?? 'event' };
+  }
+}
+
 const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled']);
 import { probeProvider } from '../provider-probe.mjs';
 
@@ -117,6 +142,7 @@ export class WorkerRegistry {
       startedAt: job.startedAt, endedAt: job.endedAt,
       lastEventAt: job.lastEventAt ?? null, timeoutSeconds: job.timeoutSeconds ?? null,
       deadlineAt: job.deadlineAt ?? null, staleSeconds: quietSeconds(job),
+      eventSeq: job.eventSeq ?? 0, events: (job.events ?? []).slice(-12),
       ...(job.questions === undefined ? {} : { questions: job.questions }),
     };
     if (withResult) {
@@ -313,7 +339,7 @@ export class WorkerRegistry {
       startedAt, endedAt: null, lastEventAt: startedAt, timeoutSeconds: timeoutSec,
       deadlineAt: new Date(Date.now() + timeoutSec * 1000).toISOString(),
       result: null, error: null, stopReason: null, handle: null, waiters: [],
-      texts: [],
+      texts: [], events: [], eventSeq: 0,
     };
     this.jobs.set(id, job);
 
@@ -327,6 +353,8 @@ export class WorkerRegistry {
 
     const onEvent = (session, event) => {
       job.lastEventAt = new Date().toISOString();
+      job.events.push(eventRecord(event, ++job.eventSeq));
+      if (job.events.length > 200) job.events.splice(0, job.events.length - 200);
       switch (event.type) {
         case 'step/start':
           job.turn = event.data?.turn ?? job.turn;
@@ -744,6 +772,27 @@ export async function apply(ctx) {
             const payload = await readBody(req);
             const job = await hub.spawn(payload);
             return sendJson(res, 200, { ok: true, job: hub.view(job) });
+          }
+          if (req.method === 'GET' && parts.length === 2 && parts[1] === 'events') {
+            const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
+            const wait = parseWaitSeconds(url.searchParams.get('wait')) ?? 0;
+            const deadline = Date.now() + Math.min(wait, 300) * 1000;
+            for (;;) {
+              const live = hub.jobs.get(parts[0]);
+              if (!live) return sendJson(res, 404, { ok: false, error: 'no such job' });
+              const events = (live.events ?? []).filter((e) => e.seq > after);
+              if (events.length > 0 || live.status !== 'running' || Date.now() >= deadline) {
+                return sendJson(res, 200, {
+                  ok: true,
+                  status: live.status,
+                  events,
+                  cursor: live.eventSeq ?? after,
+                  staleSeconds: quietSeconds(live),
+                  currentTool: live.currentTool ?? null,
+                });
+              }
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
           }
           if (req.method === 'POST' && parts.length === 2 && parts[1] === 'cancel') {
             const job = await hub.cancel(parts[0]);
