@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readd
 import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MARKETPLACE_NAME = 'dsh-adapter';
@@ -285,10 +286,22 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
  *  the worker tools without spawning a subagent first. */
 function codexMcpBlock(serverPath) {
   return '[mcp_servers.dsh-adapter]\n'
-    + 'command = "node"\n'
+    + `command = ${tomlString(resolveNodeBinary())}\n`
     + `args = [${tomlString(serverPath)}]\n`
     + 'default_tools_approval_mode = "approve"\n'
     + 'tool_timeout_sec = 3600\n';
+}
+
+/** Absolute node path: a GUI client's PATH often lacks the shim a terminal
+ *  has, so "node" is not a safe launcher for the registered server. */
+function resolveNodeBinary() {
+  try {
+    const which = process.platform === 'win32' ? 'where' : 'which';
+    const out = execFileSync(which, ['node'], { encoding: 'utf8', timeout: 5000 });
+    const first = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0];
+    if (first && existsSync(first)) return first;
+  } catch { /* fall back below */ }
+  return 'node';
 }
 
 function upsertCodexMcp(text, serverPath) {
@@ -344,7 +357,7 @@ export function installCodex({ home = homedir(), scope } = {}) {
     const next = upsertCodexMcp(before, join(ROOT, 'src', 'server.mjs'));
     if (next !== before) {
       writeFileSync(configFile, next);
-      actions.push('mcp: registered dsh-adapter globally (approve, 3600s)');
+      actions.push('mcp: registered dsh-adapter globally (approve, 3600s) — restart Codex to load it');
     } else {
       actions.push('mcp: dsh-adapter already registered');
     }
