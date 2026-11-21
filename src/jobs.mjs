@@ -156,7 +156,7 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
     } catch (err) {
       if (err?.code === 'ERR_MODULE_NOT_FOUND') {
         const hint = new Error(PACKAGED
-          ? `standalone dispatch is unavailable in the installed plugin: the DSH SDK is not bundled and DSH at ${hubUrl()} did not answer. Start DSH (or correct hub_url) so jobs run inside it, or set mode="hub" with dsh_worker_config to make that requirement explicit.`
+          ? `standalone dispatch is unavailable in the installed plugin: neither the DSH SDK nor the agent runtime is bundled. Run jobs inside DSH instead - keep mode "auto" (or "hub") while DSH is running at ${hubUrl()}; no extra install is needed.`
           : `@deepseek-ai/dsh-sdk-client not installed; standalone dispatch requires it - run pnpm install in ${ROOT}, or use hub mode (dsh_worker_config mode=hub) so jobs run inside a DSH instance`);
         hint.code = 'ERR_MODULE_NOT_FOUND';
         throw hint;
