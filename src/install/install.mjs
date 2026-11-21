@@ -170,6 +170,15 @@ export function uninstallCodex({ home = homedir() } = {}) {
     const p = join(home, '.codex', 'prompts', f);
     if (existsSync(p)) { rmSync(p); actions.push(`removed: ${p}`); }
   }
+  const configFile = join(home, '.codex', 'config.toml');
+  if (existsSync(configFile)) {
+    const before = readFileSync(configFile, 'utf8');
+    if (before.includes('[mcp_servers.dsh-adapter]')) {
+      backup(configFile);
+      writeFileSync(configFile, removeCodexMcp(before));
+      actions.push('mcp: removed dsh-adapter from config.toml (backup kept)');
+    }
+  }
   return { ok: true, actions: actions.length ? actions : ['nothing to remove'] };
 }
 
@@ -271,6 +280,38 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
   return { ok: true, actions };
 }
 
+
+/** Global Codex MCP entry: the desktop client and any plain session can call
+ *  the worker tools without spawning a subagent first. */
+function codexMcpBlock(serverPath) {
+  return '[mcp_servers.dsh-adapter]\n'
+    + 'command = "node"\n'
+    + `args = [${tomlString(serverPath)}]\n`
+    + 'default_tools_approval_mode = "approve"\n'
+    + 'tool_timeout_sec = 3600\n';
+}
+
+function upsertCodexMcp(text, serverPath) {
+  const block = codexMcpBlock(serverPath);
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
+  if (start === -1) return (text.trimEnd() ? text.trimEnd() + '\n\n' : '') + block;
+  let end = start + 1;
+  while (end < lines.length && !/^\s*\[/.test(lines[end])) end += 1;
+  const before = lines.slice(0, start).join('\n').trimEnd();
+  const after = lines.slice(end).join('\n').trim();
+  return [before, block.trimEnd(), after].filter(Boolean).join('\n\n') + '\n';
+}
+
+function removeCodexMcp(text) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
+  if (start === -1) return text;
+  let end = start + 1;
+  while (end < lines.length && !/^\s*\[/.test(lines[end])) end += 1;
+  return [...lines.slice(0, start), ...lines.slice(end)].join('\n');
+}
+
 export function installCodex({ home = homedir(), scope } = {}) {
   const actions = [];
   const agentsDir = scope === 'project' ? join(process.cwd(), '.codex', 'agents') : join(home, '.codex', 'agents');
@@ -291,6 +332,24 @@ export function installCodex({ home = homedir(), scope } = {}) {
   for (const f of readdirSync(promptsSrc).filter((f) => f.endsWith('.md'))) {
     writeFileSync(join(promptsDir, f), readFileSync(join(promptsSrc, f), 'utf8'));
     actions.push(`prompt: ${join(promptsDir, f)}`);
+  }
+  // The desktop client has no subagent spawn UI; a global MCP entry lets any
+  // session call dsh_run_worker directly. Agent roles above stay for the CLI.
+  try {
+    const configFile = join(home, '.codex', 'config.toml');
+    mkdirSync(dirname(configFile), { recursive: true });
+    const before = existsSync(configFile) ? readFileSync(configFile, 'utf8') : '';
+    const bak = backup(configFile);
+    if (bak) actions.push(`backup: ${bak}`);
+    const next = upsertCodexMcp(before, join(ROOT, 'src', 'server.mjs'));
+    if (next !== before) {
+      writeFileSync(configFile, next);
+      actions.push('mcp: registered dsh-adapter globally (approve, 3600s)');
+    } else {
+      actions.push('mcp: dsh-adapter already registered');
+    }
+  } catch (err) {
+    actions.push(`mcp: registration failed — ${String(err?.message ?? err).slice(0, 160)}`);
   }
   return { ok: true, actions };
 }
