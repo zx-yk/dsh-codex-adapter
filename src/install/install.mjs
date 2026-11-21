@@ -114,6 +114,11 @@ export const GLOBAL_CONFIG_DEFAULTS = {
   // effort changes instead of being treated as a deliberate pin.
   flash_auto: false,
   pro_auto: false,
+  // Optional per-provider endpoints for upstream capability lookup. Empty
+  // entries fall back to the baseURL/apiKeyEnv found in the DSH profile patch.
+  upstream_caps: {},
+  // How long an upstream catalog stays authoritative, in seconds.
+  caps_ttl_seconds: 21600,
   // Hub-mode agent preset per tier: 'default' follows the DSH roster default.
   preset_flash: 'minimal',
   preset_pro: 'default',

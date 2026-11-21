@@ -85,6 +85,7 @@ const ROUTE_BASE = '/_dsh/dsh-adapter';
 // when it does not (the same shape the preset lookup below uses).
 import { describeBindings, resolveTierBinding, TIERS } from '../tier-binding.mjs';
 import { readGlobalConfig, writeGlobalConfig } from '../install/install.mjs';
+import { readCapsCache, writeCapsCache, capsFor, resolveProviderEndpoint, fetchUpstreamCaps } from '../model-caps.mjs';
 const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 
 // ---------- job registry ----------
@@ -130,6 +131,29 @@ export class WorkerRegistry {
    * dictionary - no provider-specific guessing. Returns {effort} for the value
    * to dispatch with, or null when the adapter offers no reasoning metadata.
    */
+  /** The provider's own catalog, cached on disk; undefined when unreachable. */
+  async upstreamCaps(provider) {
+    const cfg = this.getConfig?.() ?? {};
+    const ttl = Number(cfg.caps_ttl_seconds) || undefined;
+    this.capsCache ??= readCapsCache();
+    const cached = capsFor(this.capsCache, provider, ttl);
+    if (cached) return cached;
+    const endpoint = resolveProviderEndpoint(provider, (cfg.upstream_caps ?? {})[provider]);
+    if (!endpoint) return undefined;
+    const entry = await fetchUpstreamCaps(provider, endpoint, { ttlSeconds: ttl });
+    this.capsCache = writeCapsCache(provider, entry);
+    return entry;
+  }
+
+  /**
+   * Which effort to dispatch with, using the upstream catalog when it answers
+   * and the host's local metadata as the fallback. Both describe the same model,
+   * so only the intersection is safe: the upstream may have dropped a level the
+   * profile still declares (the pro-model thrash this plugin kept hitting).
+   *   { effort }  dispatch this effort (undefined = no reasoning option)
+   *   { skip: true } the two sources disagree; do not bind this model
+   *   null        no local reasoning metadata at all; let the probe decide
+   */
   async effortForModel(llm, binding, desired) {
     if (typeof llm.resolveModelInfo !== 'function') return null;
     let info;
@@ -137,14 +161,28 @@ export class WorkerRegistry {
     catch { return null; }
     const reasoning = info?.reasoning;
     if (!reasoning) return { effort: undefined, supported: [] };
-    const ids = (reasoning.efforts ?? []).map((e) => e.id).filter((id) => typeof id === 'string');
-    if (ids.length === 0) return null;
-    if (desired === undefined) return { effort: reasoning.defaultEffort ?? ids[0], supported: ids };
-    if (ids.includes(desired)) return { effort: desired, supported: ids };
-    for (const candidate of ['max', 'high', 'medium', 'off']) {
-      if (ids.includes(candidate)) return { effort: candidate, supported: ids };
-    }
-    return { effort: reasoning.defaultEffort ?? ids[0], supported: ids };
+    const local = (reasoning.efforts ?? []).map((e) => e.id).filter((id) => typeof id === 'string');
+    if (local.length === 0) return null;
+
+    let upstream;
+    try {
+      const caps = await this.upstreamCaps(binding.provider);
+      const entry = caps?.models?.[binding.model];
+      if (entry && Array.isArray(entry.efforts)) upstream = entry.efforts;
+    } catch { /* catalog optional */ }
+
+    const allowed = upstream ? local.filter((id) => upstream.includes(id)) : local;
+    const source = upstream ? 'upstream' : 'local';
+    if (allowed.length === 0) return { skip: true, supported: [], source };
+    const pick = (wanted) => {
+      if (wanted === undefined) return reasoning.defaultEffort && allowed.includes(reasoning.defaultEffort) ? reasoning.defaultEffort : allowed[0];
+      if (allowed.includes(wanted)) return wanted;
+      for (const candidate of ['max', 'high', 'medium', 'low', 'off']) {
+        if (allowed.includes(candidate)) return candidate;
+      }
+      return allowed[0];
+    };
+    return { effort: pick(desired), supported: allowed, source };
   }
 
   /** One bounded capability probe; the route counts as usable when it streams. */
@@ -186,6 +224,7 @@ export class WorkerRegistry {
     for (const candidate of candidates) {
       const known = await this.effortForModel(llm, candidate, effort);
       let attemptEffort;
+      if (known?.skip) continue;
       if (known) {
         // The host already answered which efforts this model accepts; the
         // probe below only proves the route streams.
@@ -209,7 +248,7 @@ export class WorkerRegistry {
           [`${tier}_auto`]: true,
         });
       } catch { /* read-only home: keep the in-memory choice */ }
-      this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model} @ ${attemptEffort ?? '(none)'}`);
+      this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model} @ ${attemptEffort ?? '(none)'} [${known?.source ?? 'probe'}]`);
       return chosen;
     }
     this.ctx?.logger?.warn?.(`dsh-adapter: no usable ${tier} route; keeping ${bound.provider}/${bound.model}`);
@@ -698,6 +737,33 @@ export async function apply(ctx) {
             providers,
             bindings: describeBindings(readGlobalConfig()),
           });
+        } catch (err) {
+          return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
+        }
+      },
+    }));
+
+    disposers.push(webServer.register({
+      kind: 'exact', path: `${ROUTE_BASE}/model-caps`,
+      handler: async (req, res) => {
+        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        try {
+          const cfg = readGlobalConfig();
+          if (req.method === 'POST') {
+            const body = await readBody(req);
+            const provider = typeof body?.provider === 'string' ? body.provider.trim() : '';
+            if (!provider) return sendJson(res, 400, { ok: false, error: 'provider required' });
+            const endpoint = resolveProviderEndpoint(provider, (cfg.upstream_caps ?? {})[provider]);
+            const entry = await fetchUpstreamCaps(provider, endpoint, { ttlSeconds: cfg.caps_ttl_seconds });
+            const cache = writeCapsCache(provider, entry);
+            return sendJson(res, 200, { ok: true, entry, cached: cache.providers[provider] });
+          }
+          const endpoints = {};
+          for (const p of ctx.llm.listProviders()) {
+            const endpoint = resolveProviderEndpoint(p.id, (cfg.upstream_caps ?? {})[p.id]);
+            endpoints[p.id] = endpoint ? { baseUrl: endpoint.baseUrl, apiKeyEnv: endpoint.apiKeyEnv, source: endpoint.source } : null;
+          }
+          return sendJson(res, 200, { ok: true, cache: readCapsCache(), endpoints });
         } catch (err) {
           return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
         }
