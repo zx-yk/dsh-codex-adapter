@@ -89,6 +89,7 @@ const COPY = {
     intro: 'Claude Code / Codex 可以给 DSH agent 分派任务，在宿主里显示为原生子代理、进度可见。配置派发默认值、执行方式，以及接入视觉与生图能力，一键装进宿主。',
     integrations: '集成',
     collapse: '折叠', expand: '展开',
+    doneAt: (t: string) => `已更新 · ${t}`,
     installed: '已安装', notInstalled: '未安装', hud: 'HUD 段',
     install: '安装', update: '更新', restore: '还原',
     confirmRestore: (name: string) => `确定从 ${name} 移除 dsh-adapter 集成？（settings 会先备份）`,
@@ -182,6 +183,7 @@ const COPY = {
     intro: 'Claude Code / Codex can dispatch tasks to DSH agents and see them as native subagents in the host with live progress. Configure dispatch defaults, execution mode, and vision / image-generation access, then install into the host in one click.',
     integrations: 'Integrations',
     collapse: 'Collapse', expand: 'Expand',
+    doneAt: (t: string) => `Updated · ${t}`,
     installed: 'installed', notInstalled: 'not installed', hud: 'HUD segment',
     install: 'Install', update: 'Update', restore: 'Restore',
     confirmRestore: (name: string) => `Remove the dsh-adapter integration from ${name}? (settings are backed up first)`,
@@ -407,6 +409,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     })),
   ], [presetRoster, copy]);
   const [notice, setNotice] = useState('');
+  // Per-integration feedback, rendered next to the button that was pressed.
+  const [rowNote, setRowNote] = useState<Record<string, { kind: 'working' | 'ok' | 'error'; text: string }>>({});
   const [busy, setBusy] = useState(false);
   const [provForm, setProvForm] = useState<{
     originalId?: string; name: string; type: 'api' | 'cli'; models: string;
@@ -543,12 +547,17 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const act = useCallback(async (target: string, confirmName?: string) => {
     if (confirmName && !window.confirm(copy.confirmRestore(confirmName))) return;
     setBusy(true); setNotice(copy.working);
+    setRowNote((m) => ({ ...m, [target]: { kind: 'working', text: copy.working } }));
     try {
       const r = await post('/install', { target });
       if (r.ok === false) throw new Error(r.error);
       setNotice((r.actions ?? []).join('；'));
+      setRowNote((m) => ({ ...m, [target]: { kind: 'ok', text: copy.doneAt(new Date().toLocaleTimeString()) } }));
       const s = await get('/install/status'); if (s.ok) setStatus(s.status);
-    } catch (e: any) { setNotice(String(e?.message ?? e)); } finally { setBusy(false); }
+    } catch (e: any) {
+      setNotice(String(e?.message ?? e));
+      setRowNote((m) => ({ ...m, [target]: { kind: 'error', text: String(e?.message ?? e) } }));
+    } finally { setBusy(false); }
   }, [post, get, copy]);
 
   const applyPatch = useCallback((patch: Record<string, any>) => {
@@ -697,8 +706,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       {extra}
       <span style={{ flex: 1 }} />
       {!installed && <button style={S.btn} title={tips.install} disabled={busy} onClick={() => { void act(installTarget); }}>{copy.install}</button>}
-      {installed && <button style={S.btn} title={tips.update} disabled={busy} onClick={() => { void act(installTarget); }}>{copy.update}</button>}
+      {installed && <button style={S.btn} title={tips.update} disabled={busy} onClick={() => { void act(installTarget); }}>{rowNote[installTarget]?.kind === 'working' ? copy.working : copy.update}</button>}
       {installed && <button style={{ ...S.btn, opacity: 0.75 }} title={tips.restore} disabled={busy} onClick={() => { void act(uninstallTarget, name); }}>{copy.restore}</button>}
+      {rowNote[installTarget] && (
+        <span style={{
+          fontSize: 11.5, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          opacity: rowNote[installTarget].kind === 'working' ? 0.6 : 0.85,
+          color: rowNote[installTarget].kind === 'error' ? '#e5484d' : undefined,
+        }} title={rowNote[installTarget].text}>{rowNote[installTarget].text}</span>
+      )}
     </div>
   );
 
