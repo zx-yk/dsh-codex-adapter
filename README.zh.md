@@ -153,7 +153,7 @@ dsh web
 
 ### 配置 DeepSeek 凭据（standalone 模式专用）
 
-在 hub 模式下 — 即上面的安装方式 — worker 运行在 DSH 实例内部，使用 DSH 实例已配置的 DeepSeek 凭据。无需额外设置。
+在 hub 模式下 — 默认且即上面的安装方式 — worker 运行在 DSH 实例内部，使用 DSH 实例已配置的 DeepSeek 凭据。无需额外设置。standalone 仅是源码 checkout 的回退路径：打包插件既不带 DSH SDK 也不带 worker runtime，无法自行回退。
 
 仅 standalone 回落方案需要自己的 key：从宿主派发任务而没有 DSH 实例运行时，会启动一个独立的 worker runtime 进程。从 [platform.deepseek.com](https://platform.deepseek.com) 取 API key，写入 `~/.config/dsh-adapter/.env`：
 

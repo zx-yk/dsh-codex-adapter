@@ -153,7 +153,7 @@ The `link:` protocol symlinks the profile dependency to this repository, so rebu
 
 ### Configure DeepSeek credentials (standalone only)
 
-In hub mode — the installation above — workers run inside the DSH instance and use the DeepSeek credentials it is already configured with. Nothing else to set up.
+In hub mode — the default and the installation above — workers run inside the DSH instance and use the DeepSeek credentials it is already configured with. Nothing else to set up. Standalone is a source-checkout fallback only: the packaged plugin ships neither the DSH SDK nor the worker runtime, so it cannot fall back on its own.
 
 Only the standalone fallback needs a key of its own: dispatching from a host with no DSH instance running launches a worker runtime as a separate process. Obtain an API key from [platform.deepseek.com](https://platform.deepseek.com) and write it to `~/.config/dsh-adapter/.env`:
 

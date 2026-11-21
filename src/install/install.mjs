@@ -77,7 +77,9 @@ function CONFIG_DIR_HOME() { return join(homedir(), '.config', 'dsh-adapter'); }
 export const GLOBAL_CONFIG_DEFAULTS = {
   default_tier: 'flash',
   default_effort: 'max',
-  mode: 'auto',
+  // hub-only by default: the packaged plugin ships no SDK/runtime, so a
+  // silent standalone fallback can only fail. Users who want it opt in.
+  mode: 'hub',
   default_timeout_seconds: 1800,
   hub_url: 'http://127.0.0.1:3080',
   // auto = orchestrator picks the tier; flash-only / pro-only clamp every

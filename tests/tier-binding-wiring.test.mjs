@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { GLOBAL_CONFIG_DEFAULTS } from '../src/install/install.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,4 +89,9 @@ test('standalone failures do not tell an installed plugin to run pnpm install', 
   assert.ok(jobsStandalone.includes('const PACKAGED ='));
   assert.ok(jobsStandalone.includes('standalone dispatch is unavailable in the installed plugin'));
   assert.ok(jobsStandalone.includes('the bundled DSH runtime is missing'));
+});
+
+
+test('worker mode defaults to hub, so the packaged plugin never falls back silently', () => {
+  assert.equal(GLOBAL_CONFIG_DEFAULTS.mode, 'hub');
 });

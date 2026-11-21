@@ -135,7 +135,7 @@ const COPY = {
     cardRuntime: { t: '执行与连接', d: 'worker 会话跑在本实例内还是独立进程，单个任务的超时上限，以及 CC / Codex 探测本实例的地址。' },
     cardMM: { t: '视觉与生图', d: '给纯文本的 DSH 模型借来眼睛和画笔：describe_image、会话贴图转写与 generate_image 都用这里的设置。' },
     cardCustomProv: { t: '自定义 Provider', d: '接入自己的 API 或本地命令；保存后会出现在上面的视觉 / 生图 provider 选择里。' },
-    modeDesc: { auto: 'auto · 优先 hub', hub: 'hub · 必须 hub', standalone: 'standalone · 独立进程' },
+    modeDesc: { hub: 'hub · 默认（在 DSH 内运行）', auto: 'auto · 回退独立进程（需源码依赖）', standalone: 'standalone · 独立进程（需源码依赖）' },
     save: '保存', saved: '已保存', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。',
     history: '历史看板', historyEmpty: '还没有历史记录。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
     historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
@@ -234,7 +234,7 @@ const COPY = {
     cardRuntime: { t: 'Execution & connection', d: 'Whether worker sessions run inside this instance or a separate process, the per-job timeout, and the address CC / Codex probes.' },
     cardMM: { t: 'Vision & image generation', d: "Lends the harness's text-only models eyes and a brush: describe_image, pasted-image transcription and generate_image all use these settings." },
     cardCustomProv: { t: 'Custom providers', d: 'Bring your own API or local command; saved providers appear in the vision / image-gen selects above.' },
-    modeDesc: { auto: 'auto · prefer hub', hub: 'hub · require hub', standalone: 'standalone' },
+    modeDesc: { hub: 'hub · default (runs inside DSH)', auto: 'auto · fall back to standalone (source checkout)', standalone: 'standalone (source checkout)' },
     save: 'Save', saved: 'Saved', jobs: 'Live worker jobs', empty: 'No worker jobs yet.',
     history: 'History', historyEmpty: 'No history yet.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
     historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
@@ -924,7 +924,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         {block(copy.cardRuntime, (<>
           <label style={S.field}><span style={S.fieldLabel}>{copy.mode}</span>
             <CustomSelect value={config.mode} onChange={(v) => field('mode', v)}
-              options={(['auto', 'hub', 'standalone'] as const).map((m) => ({ value: m, label: copy.modeDesc[m] }))} /></label>
+              options={(['hub', 'auto', 'standalone'] as const).map((m) => ({ value: m, label: copy.modeDesc[m] }))} /></label>
           <label style={S.field}><span style={S.fieldLabel}>{copy.timeout}</span>
             <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} type="number" min={60} max={7200} value={config.default_timeout_seconds}
               onChange={(e) => fieldLocal('default_timeout_seconds', Number(e.target.value))}
