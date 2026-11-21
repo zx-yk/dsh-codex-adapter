@@ -424,7 +424,6 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [busy, setBusy] = useState(false);
   const [historyRows, setHistoryRows] = useState<any[]>([]);
   const [historyAgg, setHistoryAgg] = useState<any>(null);
-  const [historyCollapsed, setHistoryCollapsed] = useState(true);
   const [provForm, setProvForm] = useState<{
     originalId?: string; name: string; type: 'api' | 'cli'; models: string;
     base_url: string; api_key: string; imagegen_model: string;
@@ -432,8 +431,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   } | null>(null);
   const [modelAdd, setModelAdd] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ key: string; ok?: boolean; steps?: any[]; error?: string; busy: boolean } | null>(null);
-  const [integrationsCollapsed, toggleIntegrations] = useCollapseSection('integrations');
-  const [globalConfigCollapsed, toggleGlobalConfig] = useCollapseSection('global-config');
+  const TABS = ['integrations', 'config', 'history'] as const;
+  type TabKey = (typeof TABS)[number];
+  const [tab, setTab] = useState<TabKey>(() => {
+    try {
+      const saved = localStorage.getItem('dsh-adapter-tab');
+      return (TABS as readonly string[]).includes(saved ?? '') ? (saved as TabKey) : 'config';
+    } catch { return 'config'; }
+  });
+  useEffect(() => { try { localStorage.setItem('dsh-adapter-tab', tab); } catch { /* private mode */ } }, [tab]);
   // Deliberately no default dispatch-target select here: CLI backends stay
   // opt-in per call via the worker argument (see the read-only workerOptIn
   // card below). Re-adding a default would silently re-route every
@@ -739,18 +745,6 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   );
 
   /** Clickable section header that toggles its section's collapsed state. */
-  const sectionHeader = (text: string, collapsed: boolean, toggle: () => void) => (
-    <div
-      role="button" tabIndex={0} aria-expanded={!collapsed}
-      title={collapsed ? copy.expand : copy.collapse}
-      onClick={toggle}
-      onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
-      style={{ ...S.section, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' as const }}
-    >
-      <span aria-hidden="true" style={{ fontSize: 11, width: 12, flexShrink: 0, textAlign: 'center' as const, opacity: 0.85 }}>{collapsed ? '▸' : '▾'}</span>
-      <span>{text}</span>
-    </div>
-  );
 
   // --- jobs board (WPC10; workspace groups + lock badges: WPC13) ------------
   const rows = jobsLoaded ? displayJobs(jobs, ghosts) : [];
@@ -824,8 +818,20 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       <div style={{ fontSize: 19, fontWeight: 600, marginBottom: -2 }}>{copy.title}</div>
       <div style={{ opacity: 0.75 }}>{copy.intro}</div>
 
-      {sectionHeader(copy.integrations, integrationsCollapsed, toggleIntegrations)}
-      {!integrationsCollapsed && (
+      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid rgba(128,128,128,0.2)', marginTop: 2 }}>
+        {([['integrations', copy.integrations], ['config', copy.globalConfig], ['history', copy.history]] as const).map(([key, label]) => (
+          <button key={key} type="button" onClick={() => setTab(key)}
+            style={{
+              padding: '6px 12px', fontSize: 12.5, border: 'none', background: 'transparent', cursor: 'pointer',
+              color: tab === key ? 'inherit' : 'rgba(128,128,128,0.85)',
+              fontWeight: tab === key ? 600 : 400,
+              borderBottom: tab === key ? '2px solid #4c8dff' : '2px solid transparent',
+              marginBottom: -1,
+            }}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'integrations' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {integrationRow('Claude Code', !!status?.claude?.installed,
             status?.claude?.installed ? <span style={S.chip(!!status?.claude?.hud)}>{copy.hud}</span> : null,
@@ -849,8 +855,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         </div>
       )}
 
-      {sectionHeader(copy.globalConfig, globalConfigCollapsed, toggleGlobalConfig)}
-      {!globalConfigCollapsed && (<>
+      {tab === 'config' && (<>
       {config && (<>
         <div style={S.group}>{copy.groupDispatch}</div>
         {block(copy.cardDispatch, (<>
@@ -1048,8 +1053,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
       {notice !== '' && <div style={{ fontSize: 12, opacity: 0.8, whiteSpace: 'pre-wrap' }}>{notice}</div>}
 
-      {sectionHeader(copy.history, historyCollapsed, () => setHistoryCollapsed((v) => !v))}
-      {!historyCollapsed && (
+      {tab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
             <span>{copy.historyTotal}: <b>{historyAgg?.total ?? 0}</b></span>
@@ -1099,6 +1103,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         </div>
       )}
 
+      {tab === 'history' && (<>
       <div style={S.section}>{copy.jobs}</div>
       {!jobsLoaded || groups.length === 0 ? (
         <div style={{ opacity: 0.55 }}>{copy.empty}</div>
@@ -1123,6 +1128,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           </table>
         </div>
       )}
+      </>)}
       {hoverTask && createPortal(
         <div style={{
           position: 'fixed', right: hoverTask.right, zIndex: 9999,
