@@ -18,6 +18,7 @@ const server = read('src/server.mjs');
 const hub = read('src/hub/index.mjs');
 const jobs = read('src/jobs.mjs');
 const hubClient = read('src/hub-client.mjs');
+const jobsStandalone = read('src/jobs.mjs');
 
 /** Every line that opens this call must also pass the binding. */
 function callSitesCarryBinding(source, needle) {
@@ -80,4 +81,11 @@ test('the hub client resolves its URL per call, not at module load', () => {
   assert.equal(hubClient.includes('const BASE ='), false);
   assert.ok(hubClient.includes('function apiBase()'));
   assert.ok(hubClient.includes('readGlobalConfig().hub_url'));
+});
+
+
+test('standalone failures do not tell an installed plugin to run pnpm install', () => {
+  assert.ok(jobsStandalone.includes('const PACKAGED ='));
+  assert.ok(jobsStandalone.includes('standalone dispatch is unavailable in the installed plugin'));
+  assert.ok(jobsStandalone.includes('the bundled DSH runtime is missing'));
 });
