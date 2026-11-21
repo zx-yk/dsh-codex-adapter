@@ -122,12 +122,68 @@ export class WorkerRegistry {
     this.shard.publish([...this.jobs.values()].map((j) => this.view(j)));
   }
 
+  /** One bounded capability probe; the route counts as usable when it streams. */
+  async probeRoute(llm, binding) {
+    try {
+      const result = await probeProvider(llm, binding, { timeoutMs: 12000 });
+      return result.status === 'verified' || result.status === 'no_tool_call';
+    } catch { return false; }
+  }
+
+  /**
+   * Resolve a tier that the user has not pinned. The shipped default route
+   * (deepseek-official) fails on installs without DEEPSEEK_API_KEY, and a
+   * provider that exists may still have no channel for the requested model —
+   * the pro tier hits exactly that. Probe the configured providers, take the
+   * first route that streams, and persist it so later dispatches skip the
+   * search. Pinned bindings never reach this path.
+   */
+  async resolveUsableTier(tier, bound) {
+    this.autoTier ??= {};
+    if (this.autoTier[tier]) return this.autoTier[tier];
+    const llm = this.ctx?.get?.('llm') ?? this.ctx?.llm;
+    if (!llm) return bound;
+    if (await this.probeRoute(llm, bound)) { this.autoTier[tier] = bound; return bound; }
+    const builtin = new Set(['deepseek-official', 'deepseek-account']);
+    let ids = [];
+    try {
+      ids = llm.listProviders().map((p) => p.id).filter((id) => id !== bound.provider);
+    } catch { return bound; }
+    ids.sort((a, b) => Number(builtin.has(a)) - Number(builtin.has(b)));
+    const candidates = [];
+    for (const id of ids) {
+      let models = [];
+      try { models = await llm.listModels(id); } catch { continue; }
+      for (const m of models.slice(0, 3)) candidates.push({ provider: id, model: m.id });
+      if (candidates.length >= 5) break;
+    }
+    for (const candidate of candidates) {
+      if (await this.probeRoute(llm, candidate)) {
+        this.autoTier[tier] = candidate;
+        try {
+          writeGlobalConfig({ [`${tier}_provider`]: candidate.provider, [`${tier}_model`]: candidate.model });
+        } catch { /* read-only home: keep the in-memory choice */ }
+        this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model}`);
+        return candidate;
+      }
+    }
+    this.ctx?.logger?.warn?.(`dsh-adapter: no usable ${tier} route; keeping ${bound.provider}/${bound.model}`);
+    return bound;
+  }
+
   async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset }) {
     if (!TIERS.includes(tier)) throw new Error(`unknown tier "${tier}"`);
     // An explicit {provider, model} from the caller wins (the MCP process owns
     // session-level overrides, exactly as it does for presets); otherwise the
     // hub's own stored config decides, and failing that the tier default.
-    const bound = resolveTierBinding(tier, this.getConfig?.() ?? {});
+    const tierConfig = this.getConfig?.() ?? {};
+    const pinned = [provider, model, tierConfig[`${tier}_provider`], tierConfig[`${tier}_model`]]
+      .some((v) => typeof v === 'string' && v.trim() !== '');
+    let bound = resolveTierBinding(tier, tierConfig);
+    // Nothing pinned means the user is on the shipped default (deepseek-official),
+    // which needs DEEPSEEK_API_KEY. Find a route that actually works once, then
+    // remember it, instead of failing every dispatch on a missing key.
+    if (!pinned) bound = await this.resolveUsableTier(tier, bound);
     const resolvedProvider = typeof provider === 'string' && provider.trim() !== '' ? provider.trim() : bound.provider;
     const resolvedModel = typeof model === 'string' && model.trim() !== '' ? model.trim() : bound.model;
     if (!['off', 'high', 'max'].includes(effort)) throw new Error(`unknown effort "${effort}"`);
@@ -555,7 +611,12 @@ export async function apply(ctx) {
         if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
         try {
           const { readGlobalConfig } = await import('../install/install.mjs');
-          const providers = ctx.llm.listProviders().map((p) => ({ id: p.id, name: p.name ?? p.id }));
+          const providers = [];
+          for (const p of ctx.llm.listProviders()) {
+            let models = [];
+            try { models = (await ctx.llm.listModels(p.id)).map((m) => m.id); } catch { /* adapter without a catalog */ }
+            providers.push({ id: p.id, name: p.name ?? p.id, models });
+          }
           return sendJson(res, 200, {
             ok: true,
             providers,

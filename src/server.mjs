@@ -12,7 +12,7 @@ import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks
 import { resolveWorkerCwd } from './paths.mjs';
 import { detectOrchestrator } from './process-info.mjs';
 
-const server = new McpServer({ name: 'dsh-adapter', version: '0.1.2' });
+const server = new McpServer({ name: 'dsh-adapter', version: '0.1.3' });
 
 const tierSchema = z.enum(['flash', 'pro']).optional().describe('Worker model tier. flash = mechanical, well-scoped work (single-file edits, lookups, formatting); pro = multi-file changes, debugging, design judgment. Omit to use the session default. Ignored when worker= is set.');
 const effortSchema = z.enum(['off', 'high', 'max']).optional().describe('Reasoning effort for the worker. Omit to use the session default. With worker= it only applies when passed explicitly and the profile supports it (agy maps to low/medium/high).');
@@ -282,11 +282,15 @@ server.registerTool('dsh_worker_config', {
   const unknown = available === null
     ? []
     : custom.filter((tier) => !available.some((p) => p.id === bindings[tier].provider));
+  const availableModels = available === null
+    ? null
+    : Object.fromEntries(available.map((p) => [p.id, p.models ?? []]));
   return text({
     ...sessionConfig,
     hub_reachable: reachable,
     bindings,
     available_providers: available,
+    available_models: availableModels,
     ...(available === null && custom.length > 0
       ? { providers_note: 'The hub is not reachable, so the configured provider ids could not be checked against what DSH actually has. A route DSH does not know will fail at dispatch, not here.' }
       : {}),

@@ -516,10 +516,23 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       const [j, s, c, pr] = await Promise.all([get('/jobs'), get('/install/status'), get('/config'), get('/presets')]);
       if (j.ok) mergeJobs(j.jobs ?? []);
       if (s.ok) setStatus(s.status);
-      if (c.ok) setConfig((prev: any) => prev ?? c.config);
+      if (c.ok) {
+        setConfig((prev: any) => prev ?? c.config);
+        // The desktop host binds an OS-assigned port on every launch, so the
+        // stored hub_url goes stale and host-side MCP shims fall back to
+        // standalone mode. Opening this page is the natural moment to repoint
+        // it at the address the page itself was served from. A hub_url naming
+        // another machine is left alone.
+        const origin = window.location.origin;
+        const hubUrl = String(c.config?.hub_url ?? '');
+        const isLocalOrEmpty = hubUrl === '' || /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(hubUrl);
+        if (/^https?:\/\//.test(origin) && isLocalOrEmpty && hubUrl !== origin) {
+          void post('/config', { hub_url: origin }).then((r) => { if (r.ok) setConfig(r.config); }).catch(() => {});
+        }
+      }
       if (pr.ok) setPresetRoster({ defaultId: pr.defaultId, presets: pr.presets ?? [] });
     } catch { /* instance restarting */ }
-  }, [get, mergeJobs]);
+  }, [get, post, mergeJobs]);
 
   useEffect(() => {
     void refreshAll();
