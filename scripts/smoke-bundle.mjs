@@ -58,6 +58,18 @@ console.log('[smoke:mcp] bundle assertions OK: no inlined @deepseek-ai/* code; l
 const tmp = mkdtempSync(join(tmpdir(), 'dsh-crew-smoke-'));
 let child = null;
 let finished = false;
+
+// Windows keeps the child's handles on the copied tree until the process is
+// really gone, so wait for exit before deleting the temp dir.
+async function stopChild() {
+  if (!child || child.exitCode !== null) return;
+  child.kill();
+  await Promise.race([
+    new Promise((resolve) => child.once('exit', resolve)),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ]);
+  if (process.platform === 'win32') await new Promise((resolve) => setTimeout(resolve, 300));
+}
 try {
   for (const f of ['lib/server.mjs', 'package.json', '.mcp.json']) {
     cpSync(join(ROOT, f), join(tmp, f), { recursive: true });
@@ -139,13 +151,16 @@ try {
   console.log('[smoke:mcp] tools/list OK: all ' + names.length + ' tools present: ' + names.join(', '));
 
   finished = true;
-  child.kill();
-  rmSync(tmp, { recursive: true, force: true });
+  await stopChild();
+  // Windows can hold a handle on the copied tree for a moment after the child
+  // exits; retrying avoids a spurious EPERM that would fail an otherwise
+  // passing smoke test.
+  rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   console.log('\nSMOKE PASSED: the bundled MCP server starts and serves initialize + tools/list from a node_modules-free copy.');
 } catch (err) {
   finished = true;
-  if (child) child.kill();
-  rmSync(tmp, { recursive: true, force: true });
+  await stopChild();
+  rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   fail(err && err.message ? err.message : String(err));
 }
 

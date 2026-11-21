@@ -90,6 +90,16 @@ function fail(msg) {
 }
 
 function run(cmd, args, { cwd, timeoutMs = 300_000, env = {} } = {}) {
+  // Windows ships npm as a .cmd shim, which execFileSync cannot start without a
+  // shell. Run the bundled CLI through the current node binary instead, so the
+  // same code path works on Linux, macOS and Windows.
+  if (cmd === 'npm') {
+    const npmCli = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    if (existsSync(npmCli)) {
+      args = [npmCli, ...args];
+      cmd = process.execPath;
+    }
+  }
   try {
     return execFileSync(cmd, args, {
       cwd,
