@@ -86,6 +86,15 @@ export function installVisionRoute(ctx, getConfig) {
     const decision = await next();
     if (decision.kind !== 'enter') return decision;
     if (getConfig().vision_provider === 'off') return decision;
+    // A model that accepts images itself needs no transcription; adding one
+    // would duplicate the picture's content in every step.
+    try {
+      const selection = payload.modelSelection;
+      if (selection?.provider && selection?.model) {
+        const info = await ctx.llm.resolveModelInfo(selection.provider, selection.model);
+        if ((info?.inputModalities ?? []).includes('image')) return decision;
+      }
+    } catch { /* metadata unavailable: keep transcribing */ }
     let changed = false;
     const rewritten = [];
     for (const message of decision.messages) {

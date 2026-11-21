@@ -14,6 +14,7 @@
 // discipline.
 
 import { spawn } from 'node:child_process';
+import { readCredentialRef } from './model-caps.mjs';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { join, isAbsolute, dirname } from 'node:path';
@@ -202,8 +203,10 @@ async function describeViaApi(entry, imagePath, question, model) {
   const m = model && model !== 'default' ? model : entry.models?.[0];
   if (!m) throw new Error(tr(`自定义 provider "${entry.name ?? entry.id}" 未配置模型列表，无法确定视觉模型`, `Custom provider "${entry.name ?? entry.id}" has no models configured`));
   const b64 = readFileSync(imagePath).toString('base64');
+  const apiKey = entry.api_key
+    ?? (entry.api_key_env ? (process.env[entry.api_key_env] ?? readCredentialRef(entry.api_key_env)) : undefined);
   const data = await fetchJson(`${base}/chat/completions`, {
-    apiKey: entry.api_key,
+    apiKey,
     timeoutMs: 240_000,
     body: {
       model: m,

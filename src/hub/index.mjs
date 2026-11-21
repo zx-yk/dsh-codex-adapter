@@ -494,9 +494,49 @@ async function readBody(req, limit = 64 * 1024) {
 export async function apply(ctx) {
   seedLangFromHost(ctx);
   const hub = new WorkerRegistry(ctx);
+  // Providers DSH already has configured are offered to the multimodal bridge
+  // as ready-made entries, so a vision model needs no manual base URL or key.
+  let autoProviders = [];
+  const mergeAutoProviders = (cfg) => {
+    const user = cfg.custom_providers ?? [];
+    const extra = autoProviders.filter((a) => !user.some((u) => u.id === a.id));
+    return extra.length === 0 ? cfg : { ...cfg, custom_providers: [...user, ...extra] };
+  };
+  const refreshAutoProviders = async () => {
+    try {
+      const cfg = readGlobalConfig();
+      const list = [];
+      for (const p of ctx.llm.listProviders()) {
+        const endpoint = resolveProviderEndpoint(p.id, (cfg.upstream_caps ?? {})[p.id]);
+        if (!endpoint?.baseUrl) continue;
+        const models = [];
+        try {
+          for (const m of await ctx.llm.listModels(p.id)) {
+            try {
+              const info = await ctx.llm.resolveModelInfo(p.id, m.id);
+              if ((info.inputModalities ?? []).includes('image')) models.push(m.id);
+            } catch { /* model without metadata */ }
+          }
+        } catch { /* adapter without a catalog */ }
+        if (models.length === 0) continue;
+        list.push({
+          id: 'dsh-' + p.id,
+          name: (p.name ?? p.id) + ' (DSH)',
+          type: 'api',
+          base_url: endpoint.baseUrl,
+          ...(endpoint.apiKeyEnv === undefined ? {} : { api_key_env: endpoint.apiKeyEnv }),
+          models,
+          auto: true,
+        });
+      }
+      autoProviders = list;
+    } catch { /* multimodal stays manual */ }
+  };
   try {
     const { readGlobalConfig } = await import('../install/install.mjs');
-    hub.getConfig = () => readGlobalConfig();
+    hub.getConfig = () => mergeAutoProviders(readGlobalConfig());
+    hub.refreshAutoProviders = refreshAutoProviders;
+    void refreshAutoProviders();
   } catch {}
   const disposers = [];
 
@@ -505,7 +545,7 @@ export async function apply(ctx) {
   try {
     const { createMultimodalTools } = await import('../multimodal.mjs');
     const { readGlobalConfig } = await import('../install/install.mjs');
-    for (const tool of createMultimodalTools(() => readGlobalConfig())) {
+    for (const tool of createMultimodalTools(() => hub.getConfig())) {
       disposers.push(ctx.effect(() => ctx.tools.register(tool), `dsh-adapter: ${tool.name} tool`));
     }
   } catch (err) {
@@ -517,7 +557,7 @@ export async function apply(ctx) {
   try {
     const { installVisionRoute } = await import('../vision-route.mjs');
     const { readGlobalConfig } = await import('../install/install.mjs');
-    disposers.push(installVisionRoute(ctx, () => readGlobalConfig()));
+    disposers.push(installVisionRoute(ctx, () => hub.getConfig()));
   } catch (err) {
     ctx.logger?.warn?.(`dsh-adapter: vision route unavailable: ${err?.message ?? err}`);
   }
@@ -680,9 +720,13 @@ export async function apply(ctx) {
           const { readGlobalConfig, writeGlobalConfig } = await import(`../install/install.mjs?t=${Date.now()}`);
           if (req.method === 'GET') {
             adoptLang(new URL(req.url, 'http://localhost').searchParams.get('lang'));
-            return sendJson(res, 200, { ok: true, config: readGlobalConfig() });
+            await hub.refreshAutoProviders?.();
+            return sendJson(res, 200, { ok: true, config: hub.getConfig() });
           }
-          if (req.method === 'POST') return sendJson(res, 200, { ok: true, config: writeGlobalConfig(await readBody(req)) });
+          if (req.method === 'POST') {
+            writeGlobalConfig(await readBody(req));
+            return sendJson(res, 200, { ok: true, config: hub.getConfig() });
+          }
           return sendJson(res, 405, { ok: false, error: 'GET or POST' }, { allow: 'GET, POST' });
         } catch (err) {
           return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
@@ -719,6 +763,7 @@ export async function apply(ctx) {
         if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
         try {
           const { readGlobalConfig } = await import('../install/install.mjs');
+          await hub.refreshAutoProviders?.();
           const providers = [];
           for (const p of ctx.llm.listProviders()) {
             let models = [];
