@@ -25,8 +25,15 @@ function eventRecord(event, seq) {
       return { seq, at, kind: 'step', turn: data.turn ?? null, step: data.step ?? null };
     case 'tool/call':
       return { seq, at, kind: 'tool', tool: data.name ?? 'tool', detail: clip(JSON.stringify(data.input ?? data.arguments ?? ''), 300) };
-    case 'tool/result':
-      return { seq, at, kind: 'tool-result', tool: data.name ?? null, ok: data.ok ?? null, detail: clip(JSON.stringify(data.result ?? data.error ?? ''), 240) };
+    case 'tool/result': {
+      const text = (data.message?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join(' ');
+      const detail = text || (typeof data.error === 'object' ? data.error?.name ?? '' : data.error) || '';
+      return { seq, at, kind: 'tool-result', tool: data.name ?? null, ok: data.ok ?? null, detail: clip(String(detail), 400) };
+    }
+    case 'approval/asked':
+      return { seq, at, kind: 'approval', tool: data.tool ?? data.request?.tool ?? null, detail: clip(String(data.reason ?? data.request?.reason ?? 'approval requested'), 300) };
+    case 'approval/decided':
+      return { seq, at, kind: 'approval-result', detail: clip(String(data.outcome ?? data.decision ?? ''), 120) };
     case 'assistant/message': {
       const text = (data.message?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join('');
       return { seq, at, kind: 'text', text: clip(text, 500) };
@@ -405,6 +412,14 @@ export class WorkerRegistry {
         },
       });
       job.handle = handle;
+      // Nobody attends a worker session, so an interactive approval would sit
+      // until the job timeout (or forever before the watchdog existed).
+      // 'never' makes the tool call fail closed immediately with a clear
+      // message the model can react to.
+      try {
+        const approval = this.ctx.get?.('approval') ?? this.ctx.approval;
+        approval?.setPolicy?.(handle.agent, 'never');
+      } catch { /* older hosts: leave the default policy */ }
       if (job.status === 'needs_input') { await handle.dispose(); return; }
       try {
         // Group the worker session under the workspace of its cwd; create the

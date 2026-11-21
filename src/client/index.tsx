@@ -4,6 +4,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { persistConfigPatch } from './config-save.mjs';
 
 import { reconcileGhosts, displayJobs, groupJobs, workspaceKey, basenameOf, abbrevPath, workspaceLocks, lockBadgeOf, statusInfoOf, ghostPidOf, procBadgeOf, dueProcProbes } from './jobs-view';
 
@@ -136,13 +137,13 @@ const COPY = {
     cardMM: { t: '视觉与生图', d: '给纯文本的 DSH 模型借来眼睛和画笔：describe_image、会话贴图转写与 generate_image 都用这里的设置。' },
     cardCustomProv: { t: '自定义 Provider', d: '接入自己的 API 或本地命令；保存后会出现在上面的视觉 / 生图 provider 选择里。' },
     modeDesc: { hub: 'hub · 默认（在 DSH 内运行）', auto: 'auto · 回退独立进程（需源码依赖）', standalone: 'standalone · 独立进程（需源码依赖）' },
-    save: '保存', saved: '已保存', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。',
+    save: '保存', saved: '已保存', saveFailed: '保存失败，已恢复服务器中的配置：', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。',
     history: '历史看板', historyEmpty: '还没有历史记录。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
     historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
     historyStatus: '状态', historyCost: '耗时', historyTask: '任务',
     eventsTitle: '事件流', eventsEmpty: '还没有事件。', eventsOnlyHub: '只有 hub 任务有事件流。', eventsHint: '点击行展开事件流',
     eventsMeta: (j: any) => `${j.provider ?? '?'}/${j.model ?? '?'}${j.effort ? ' @' + j.effort : ''} · ${j.timeoutSeconds ? j.timeoutSeconds + 's 上限' : '无上限'}${j.staleSeconds != null ? ' · 静默 ' + j.staleSeconds + 's' : ''}`,
-    eventText: '输出', eventTool: '工具', eventResult: '结果', eventStep: '步骤', eventEnd: '结束',
+    eventText: '输出', eventTool: '工具', eventResult: '结果', eventStep: '步骤', eventEnd: '结束', eventApproval: '审批',
     statusRunning: '运行中', statusStalled: '疑似卡住', statusNeedsInput: '需输入', statusDone: '完成', statusFailed: '失败', statusCancelled: '已取消', statusOrphaned: '失联',
     statusTitle: (s: string) => `状态：${s}`,
     orphanWriterGone: (origin: string) => `所属实例已消失：写入该状态的进程（${origin}）已不存在，任务随它一起终止（最后状态 running）`,
@@ -240,13 +241,13 @@ const COPY = {
     cardMM: { t: 'Vision & image generation', d: "Lends the harness's text-only models eyes and a brush: describe_image, pasted-image transcription and generate_image all use these settings." },
     cardCustomProv: { t: 'Custom providers', d: 'Bring your own API or local command; saved providers appear in the vision / image-gen selects above.' },
     modeDesc: { hub: 'hub · default (runs inside DSH)', auto: 'auto · fall back to standalone (source checkout)', standalone: 'standalone (source checkout)' },
-    save: 'Save', saved: 'Saved', jobs: 'Live worker jobs', empty: 'No worker jobs yet.',
+    save: 'Save', saved: 'Saved', saveFailed: 'Save failed; restored the server configuration:', jobs: 'Live worker jobs', empty: 'No worker jobs yet.',
     history: 'History', historyEmpty: 'No history yet.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
     historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
     historyStatus: 'Status', historyCost: 'Duration', historyTask: 'Task',
     eventsTitle: 'Events', eventsEmpty: 'No events yet.', eventsOnlyHub: 'Only hub jobs expose an event stream.', eventsHint: 'Click a row to expand its event stream',
     eventsMeta: (j: any) => `${j.provider ?? '?'}/${j.model ?? '?'}${j.effort ? ' @' + j.effort : ''} · ${j.timeoutSeconds ? j.timeoutSeconds + 's cap' : 'no cap'}${j.staleSeconds != null ? ' · quiet ' + j.staleSeconds + 's' : ''}`,
-    eventText: 'text', eventTool: 'tool', eventResult: 'result', eventStep: 'step', eventEnd: 'end',
+    eventText: 'text', eventTool: 'tool', eventResult: 'result', eventStep: 'step', eventEnd: 'end', eventApproval: 'approval',
     statusRunning: 'running', statusStalled: 'stalled', statusNeedsInput: 'needs input', statusDone: 'done', statusFailed: 'failed', statusCancelled: 'cancelled', statusOrphaned: 'orphaned',
     statusTitle: (s: string) => `status: ${s}`,
     orphanWriterGone: (origin: string) => `Owning instance gone: the process that wrote this status (${origin}) no longer exists — the job died with it (last status: running)`,
@@ -301,7 +302,7 @@ const S = {
   group: { margin: '4px 0 -3px', fontSize: 12, opacity: 0.55 },
   // Card with a title + description header above its fields.
   block: { border: '1px solid rgba(128,128,128,0.22)', borderRadius: 10, padding: '11px 14px 13px', display: 'flex', flexDirection: 'column' as const, gap: 10 },
-  blockGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 14px', alignItems: 'end' as const },
+  blockGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '12px 14px', alignItems: 'end' as const },
   settingTitle: { fontWeight: 600 as const, fontSize: 13 },
   settingDesc: { fontSize: 11.5, opacity: 0.6, marginTop: 2, lineHeight: 1.5 },
   card: { border: '1px solid rgba(128,128,128,0.22)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const },
@@ -429,6 +430,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     })),
   ], [presetRoster, copy]);
   const [notice, setNotice] = useState('');
+  const configSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Per-integration feedback, rendered next to the button that was pressed.
   const [rowNote, setRowNote] = useState<Record<string, { kind: 'working' | 'ok' | 'error'; text: string }>>({});
   const [busy, setBusy] = useState(false);
@@ -592,11 +595,21 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     } finally { setBusy(false); }
   }, [post, get, copy]);
 
-  const applyPatch = useCallback((patch: Record<string, any>) => {
-    void post('/config', patch).then((r) => {
-      if (r.ok) { setConfig(r.config); setNotice(copy.saved); setTimeout(() => setNotice(''), 1500); }
-    }).catch(() => {});
-  }, [post, copy]);
+  const applyPatch = useCallback((patch: Record<string, any>): Promise<boolean> => {
+    // Serialize writes so rapid edits cannot be persisted out of order. The
+    // optimistic UI is reconciled with the server after every failed write.
+    const save = configSaveQueue.current.then(() => persistConfigPatch(patch, {
+      post, get, onConfig: setConfig,
+      onNotice: (message: string) => {
+        if (noticeTimer.current) clearTimeout(noticeTimer.current);
+        setNotice(message);
+        if (message === copy.saved) noticeTimer.current = setTimeout(() => setNotice(''), 1500);
+      },
+      copy,
+    }));
+    configSaveQueue.current = save;
+    return save;
+  }, [post, get, copy]);
   const loadHistory = useCallback(() => {
     void get('/history?limit=100').then((r) => {
       if (r.ok) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
@@ -788,7 +801,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       {installed && <button style={{ ...S.btn, opacity: 0.75 }} title={tips.restore} disabled={busy} onClick={() => { void act(uninstallTarget, name); }}>{copy.restore}</button>}
       {rowNote[installTarget] && (
         <span style={{
-          fontSize: 11.5, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontSize: 11.5, maxWidth: 260, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', overflowWrap: 'anywhere',
           opacity: rowNote[installTarget].kind === 'working' ? 0.6 : 0.85,
           color: rowNote[installTarget].kind === 'error' ? '#e5484d' : undefined,
         }} title={rowNote[installTarget].text}>{rowNote[installTarget].text}</span>
@@ -889,9 +902,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                     : e.kind === 'text' ? copy.eventText
                     : e.kind === 'step' ? copy.eventStep
                     : e.kind === 'turn-end' ? copy.eventEnd
+                    : e.kind === 'approval' ? copy.eventApproval
+                    : e.kind === 'approval-result' ? copy.eventApproval
                     : e.kind;
                   const color = e.kind === 'tool' ? '#4c8dff'
                     : e.kind === 'tool-result' ? (e.ok === false ? '#e5484d' : '#3fb950')
+                    : (e.kind === 'approval' || e.kind === 'approval-result') ? '#f0883e'
                     : undefined;
                   const body = e.kind === 'step' ? `${e.turn ?? '?'}.${e.step ?? '?'}`
                     : e.kind === 'tool' ? `${e.tool}${e.detail ? ' ' + e.detail : ''}`
@@ -921,8 +937,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const runningJobs = jobsLoaded ? jobs.filter((j: any) => j.status === 'running' && j.originWriterAlive !== false).length : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, lineHeight: 1.55 }}>
-      <div style={{ fontSize: 19, fontWeight: 600, marginBottom: -2 }}>{copy.title}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, lineHeight: 1.55, width: '100%', minWidth: 0, maxWidth: 1000, margin: '0 auto' }}>
+      <div style={{ fontSize: 21, fontWeight: 600, marginBottom: -2 }}>{copy.title}</div>
       <div style={{ opacity: 0.75 }}>{copy.intro}</div>
 
       <div role="tablist" aria-label={copy.title}
@@ -934,7 +950,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           setTab(TABS[(index + step) % TABS.length]);
         }}
         style={{
-          position: 'sticky', top: 0, zIndex: 6, display: 'flex', gap: 2, marginTop: 2,
+          position: 'sticky', top: 0, zIndex: 6, display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 2,
           paddingTop: 4, marginBottom: -1,
           background: 'Canvas',
           borderBottom: '1px solid rgba(128,128,128,0.2)',
@@ -948,7 +964,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
               onMouseEnter={(e: any) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.10)'; }}
               onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
               style={{
-                display: 'inline-flex', alignItems: 'center',
+                display: 'inline-flex', alignItems: 'center', minWidth: 0,
                 padding: '6px 12px', fontSize: 12.5, border: 'none', background: 'transparent',
                 cursor: 'pointer', borderRadius: '6px 6px 0 0',
                 color: active ? 'inherit' : 'rgba(128,128,128,0.9)',
@@ -983,9 +999,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
               onChange={(e) => {
                 const on = e.target.checked;
                 setConfig((c: any) => ({ ...c, codex_global_mcp: on }));
-                void post('/config', { codex_global_mcp: on }).then((r) => {
-                  if (r.ok) setConfig(r.config);
-                  if (status?.codex?.installed) void act('codex');
+                void applyPatch({ codex_global_mcp: on }).then((saved) => {
+                  if (saved && status?.codex?.installed) void act('codex');
                 });
               }} />
             <span>{copy.globalMcp}</span>
