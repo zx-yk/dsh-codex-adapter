@@ -272,7 +272,10 @@ export class WorkerRegistry {
     if (!pinned) {
       const usable = await this.resolveUsableTier(tier, bound, effort);
       bound = usable.binding;
-      dispatchEffort = usable.effort ?? effort;
+      // `undefined` is a real answer here: a model whose local metadata
+      // declares no reasoning must be dispatched WITHOUT an effort, or DSH
+      // rejects the call. Only a missing key falls back to the requested one.
+      dispatchEffort = Object.prototype.hasOwnProperty.call(usable, 'effort') ? usable.effort : effort;
     }
     const resolvedProvider = typeof provider === 'string' && provider.trim() !== '' ? provider.trim() : bound.provider;
     const resolvedModel = typeof model === 'string' && model.trim() !== '' ? model.trim() : bound.model;
