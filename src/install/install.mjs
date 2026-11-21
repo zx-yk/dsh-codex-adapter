@@ -109,6 +109,11 @@ export const GLOBAL_CONFIG_DEFAULTS = {
   flash_model: '',
   pro_provider: '',
   pro_model: '',
+  // Set when the binding was discovered by the usable-route fallback rather
+  // than chosen by the user; such a binding is re-validated when the default
+  // effort changes instead of being treated as a deliberate pin.
+  flash_auto: false,
+  pro_auto: false,
   // Hub-mode agent preset per tier: 'default' follows the DSH roster default.
   preset_flash: 'minimal',
   preset_pro: 'default',

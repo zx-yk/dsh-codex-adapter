@@ -123,9 +123,9 @@ export class WorkerRegistry {
   }
 
   /** One bounded capability probe; the route counts as usable when it streams. */
-  async probeRoute(llm, binding) {
+  async probeRoute(llm, binding, effort) {
     try {
-      const result = await probeProvider(llm, binding, { timeoutMs: 12000 });
+      const result = await probeProvider(llm, { ...binding, ...(effort ? { reasoningEffort: effort } : {}) }, { timeoutMs: 12000 });
       return result.status === 'verified' || result.status === 'no_tool_call';
     } catch { return false; }
   }
@@ -138,17 +138,18 @@ export class WorkerRegistry {
    * first route that streams, and persist it so later dispatches skip the
    * search. Pinned bindings never reach this path.
    */
-  async resolveUsableTier(tier, bound) {
+  async resolveUsableTier(tier, bound, effort) {
     this.autoTier ??= {};
-    if (this.autoTier[tier]) return this.autoTier[tier];
+    const cacheKey = tier + ':' + effort;
+    if (this.autoTier[cacheKey]) return this.autoTier[cacheKey];
     const llm = this.ctx?.get?.('llm') ?? this.ctx?.llm;
-    if (!llm) return bound;
-    if (await this.probeRoute(llm, bound)) { this.autoTier[tier] = bound; return bound; }
+    if (!llm) return { binding: bound, effort };
+    if (await this.probeRoute(llm, bound, effort)) { this.autoTier[cacheKey] = { binding: bound, effort }; return this.autoTier[cacheKey]; }
     const builtin = new Set(['deepseek-official', 'deepseek-account']);
     let ids = [];
     try {
       ids = llm.listProviders().map((p) => p.id).filter((id) => id !== bound.provider);
-    } catch { return bound; }
+    } catch { return { binding: bound, effort }; }
     ids.sort((a, b) => Number(builtin.has(a)) - Number(builtin.has(b)));
     const candidates = [];
     for (const id of ids) {
@@ -157,18 +158,25 @@ export class WorkerRegistry {
       for (const m of models.slice(0, 3)) candidates.push({ provider: id, model: m.id });
       if (candidates.length >= 5) break;
     }
-    for (const candidate of candidates) {
-      if (await this.probeRoute(llm, candidate)) {
-        this.autoTier[tier] = candidate;
+    const attempts = effort && effort !== 'off' ? [effort, 'off'] : [effort];
+    for (const attemptEffort of attempts) {
+      for (const candidate of candidates) {
+        if (!(await this.probeRoute(llm, candidate, attemptEffort))) continue;
+        const chosen = { binding: candidate, effort: attemptEffort };
+        this.autoTier[cacheKey] = chosen;
         try {
-          writeGlobalConfig({ [`${tier}_provider`]: candidate.provider, [`${tier}_model`]: candidate.model });
+          writeGlobalConfig({
+            [`${tier}_provider`]: candidate.provider,
+            [`${tier}_model`]: candidate.model,
+            [`${tier}_auto`]: true,
+          });
         } catch { /* read-only home: keep the in-memory choice */ }
-        this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model}`);
-        return candidate;
+        this.ctx?.logger?.info?.(`dsh-adapter: ${tier} auto-bound to ${candidate.provider}/${candidate.model} @ ${attemptEffort}`);
+        return chosen;
       }
     }
     this.ctx?.logger?.warn?.(`dsh-adapter: no usable ${tier} route; keeping ${bound.provider}/${bound.model}`);
-    return bound;
+    return { binding: bound, effort };
   }
 
   async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset }) {
@@ -177,13 +185,19 @@ export class WorkerRegistry {
     // session-level overrides, exactly as it does for presets); otherwise the
     // hub's own stored config decides, and failing that the tier default.
     const tierConfig = this.getConfig?.() ?? {};
-    const pinned = [provider, model, tierConfig[`${tier}_provider`], tierConfig[`${tier}_model`]]
-      .some((v) => typeof v === 'string' && v.trim() !== '');
+    const explicitArgs = [provider, model].some((v) => typeof v === 'string' && v.trim() !== '');
+    const configPinned = [tierConfig[`${tier}_provider`], tierConfig[`${tier}_model`]]
+      .some((v) => typeof v === 'string' && v.trim() !== '') && tierConfig[`${tier}_auto`] !== true;
+    const pinned = explicitArgs || configPinned;
     let bound = resolveTierBinding(tier, tierConfig);
-    // Nothing pinned means the user is on the shipped default (deepseek-official),
-    // which needs DEEPSEEK_API_KEY. Find a route that actually works once, then
-    // remember it, instead of failing every dispatch on a missing key.
-    if (!pinned) bound = await this.resolveUsableTier(tier, bound);
+    let dispatchEffort = effort;
+    // An unpinned tier gets a route that actually works for this effort; an
+    // auto-bound one is re-checked because the model catalog can change.
+    if (!pinned) {
+      const usable = await this.resolveUsableTier(tier, bound, effort);
+      bound = usable.binding;
+      dispatchEffort = usable.effort ?? effort;
+    }
     const resolvedProvider = typeof provider === 'string' && provider.trim() !== '' ? provider.trim() : bound.provider;
     const resolvedModel = typeof model === 'string' && model.trim() !== '' ? model.trim() : bound.model;
     if (!['off', 'high', 'max'].includes(effort)) throw new Error(`unknown effort "${effort}"`);
@@ -197,7 +211,7 @@ export class WorkerRegistry {
     const id = `hub-${this.nextId++}-${Date.now().toString(36)}`;
     const sessionId = `session-${randomUUID()}`;
     const job = {
-      id, sessionId, tier, model: resolvedModel, provider: resolvedProvider, effort, task, source, cwd: cwdPath,
+      id, sessionId, tier, model: resolvedModel, provider: resolvedProvider, effort: dispatchEffort, task, source, cwd: cwdPath,
       status: 'running', turn: 0, step: 0, currentTool: null, toolCalls: 0,
       tokens: { input: 0, output: 0, reasoning: 0 },
       startedAt: new Date().toISOString(), endedAt: null,
@@ -206,7 +220,7 @@ export class WorkerRegistry {
     };
     this.jobs.set(id, job);
 
-    const selection = { provider: resolvedProvider, model: resolvedModel, reasoningEffort: effort };
+    const selection = { provider: resolvedProvider, model: resolvedModel, reasoningEffort: dispatchEffort };
     const presets = this.ctx.get('agentPresets');
     const cfg = this.getConfig?.() ?? {};
     const wanted = preset ?? (tier === 'flash' ? cfg.preset_flash : cfg.preset_pro);
