@@ -7,7 +7,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // ---------- D1 (P4): agy image-gen must not report success on an unverified file ----------
-test('generate_image(provider=agy) refuses when no nonce-matching image exists (no false success)', async () => {
+// The fake CLI below is a POSIX shell script and the provider spawns `agy`
+// without a shell, which Windows cannot execute (a .cmd shim needs cmd.exe).
+// Skip there instead of failing on an environment the guard cannot be shown on.
+const posixOnly = process.platform === 'win32'
+  ? { skip: 'fake agy shim is a POSIX script; Windows cannot spawn it without a shell' }
+  : {};
+
+test('generate_image(provider=agy) refuses when no nonce-matching image exists (no false success)', posixOnly, async () => {
   const work = mkdtempSync(join(tmpdir(), 'agy-guard-'));
   const home = join(work, 'home');
   const bin = join(work, 'bin');

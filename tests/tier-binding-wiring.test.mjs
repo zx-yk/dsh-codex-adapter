@@ -17,6 +17,7 @@ const read = (p) => readFileSync(join(root, p), 'utf8');
 const server = read('src/server.mjs');
 const hub = read('src/hub/index.mjs');
 const jobs = read('src/jobs.mjs');
+const hubClient = read('src/hub-client.mjs');
 
 /** Every line that opens this call must also pass the binding. */
 function callSitesCarryBinding(source, needle) {
@@ -38,10 +39,14 @@ test('the hub no longer keeps its own tier -> model table', () => {
 });
 
 test('the hub hands the resolved route to the model selection and to agents.create', () => {
-  assert.ok(hub.includes('provider: resolvedProvider, model: resolvedModel, reasoningEffort: effort'));
+  // The resolved route is assembled once, then carried into the agent
+  // selection by object reference; both halves are pinned so a refactor that
+  // drops the binding (or the effort) fails here.
+  assert.ok(hub.includes('const selection = { provider: resolvedProvider, model: resolvedModel, reasoningEffort: dispatchEffort }'));
   assert.ok(hub.includes('provider: selection.provider,'));
   assert.ok(hub.includes('model: selection.model,'));
   assert.ok(hub.includes('reasoningEffort: selection.reasoningEffort'));
+  assert.ok(hub.includes("hasOwnProperty.call(usable, 'effort')"));
 });
 
 test('the standalone harness gets the resolved route, not a hardcoded provider', () => {
@@ -66,4 +71,13 @@ test('a tier bound to a custom route carries the unverified-route caveat', () =>
   // The caveat stands until a real probe exists (#10).
   assert.ok(server.includes('route_caveat'));
   assert.ok(server.includes('prepareCall'));
+});
+
+
+test('the hub client resolves its URL per call, not at module load', () => {
+  // DSH changes port on every launch; a pinned BASE leaves a long-lived MCP
+  // process talking to a dead port and silently falling back to standalone.
+  assert.equal(hubClient.includes('const BASE ='), false);
+  assert.ok(hubClient.includes('function apiBase()'));
+  assert.ok(hubClient.includes('readGlobalConfig().hub_url'));
 });

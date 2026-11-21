@@ -5,15 +5,23 @@
 import { readGlobalConfig } from './install/install.mjs';
 import { pluginEnv } from './plugin-env.mjs';
 
-const BASE = (pluginEnv('ADAPTER_HUB') ?? readGlobalConfig().hub_url).replace(/\/$/, '');
-const API = `${BASE}/_dsh/dsh-adapter`;
+/**
+ * Resolved per call: DSH picks a fresh port on every launch and the hub URL is
+ * synced into the config afterwards, so a long-lived MCP process must not pin
+ * the value it saw at startup (that made the desktop/CLI session report the
+ * hub as unreachable after one DSH restart, then fall into standalone mode).
+ */
+function apiBase() {
+  const base = (pluginEnv('ADAPTER_HUB') ?? readGlobalConfig().hub_url ?? '').replace(/\/+$/, '');
+  return `${base}/_dsh/dsh-adapter`;
+}
 
 let lastProbe = { at: 0, ok: false };
 
 export async function hubAvailable() {
   if (Date.now() - lastProbe.at < 10_000) return lastProbe.ok;
   try {
-    const res = await fetch(`${API}/ping`, { signal: AbortSignal.timeout(800) });
+    const res = await fetch(`${apiBase()}/ping`, { signal: AbortSignal.timeout(800) });
     const body = await res.json();
     lastProbe = { at: Date.now(), ok: res.ok && body?.service === 'dsh-adapter-hub' };
   } catch {
@@ -23,7 +31,7 @@ export async function hubAvailable() {
 }
 
 async function call(path, init) {
-  const res = await fetch(`${API}${path}`, init);
+  const res = await fetch(`${apiBase()}${path}`, init);
   const body = await res.json();
   if (!res.ok || body.ok === false) throw new Error(body.error ?? `hub request failed (${res.status})`);
   return body;
