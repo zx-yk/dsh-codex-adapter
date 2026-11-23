@@ -140,6 +140,7 @@ const COPY = {
     cardCustomProv: { t: '自定义 Provider', d: '接入自己的 API 或本地命令；保存后会出现在上面的视觉 / 生图 provider 选择里。' },
     modeDesc: { hub: 'hub · 默认（在 DSH 内运行）', auto: 'auto · 回退独立进程（需源码依赖）', standalone: 'standalone · 独立进程（需源码依赖）' },
     save: '保存', saved: '已保存', saveFailed: '保存失败，已恢复服务器中的配置：', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。', emptyHint: '派发任务后，这里会实时显示进度。', loading: '加载中…',
+    workerStatus: 'Worker 状态', liveHint: '每 3 秒自动刷新', runningCount: (n: number) => `${n} 个运行中`,
     history: '历史看板', historyEmpty: '还没有历史记录', historyEmptyHint: '完成的 Worker 任务会显示在这里。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
     historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
     historyStatus: '状态', historyCost: '耗时', historyTask: '任务',
@@ -245,6 +246,7 @@ const COPY = {
     cardCustomProv: { t: 'Custom providers', d: 'Bring your own API or local command; saved providers appear in the vision / image-gen selects above.' },
     modeDesc: { hub: 'hub · default (runs inside DSH)', auto: 'auto · fall back to standalone (source checkout)', standalone: 'standalone (source checkout)' },
     save: 'Save', saved: 'Saved', saveFailed: 'Save failed; restored the server configuration:', jobs: 'Live worker jobs', empty: 'No worker jobs yet.', emptyHint: 'Dispatched jobs appear here with live progress.', loading: 'Loading…',
+    workerStatus: 'Workers', liveHint: 'Refreshes every 3s', runningCount: (n: number) => `${n} running`,
     history: 'History', historyEmpty: 'No history yet', historyEmptyHint: 'Finished worker jobs will appear here.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
     historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
     historyStatus: 'Status', historyCost: 'Duration', historyTask: 'Task',
@@ -460,15 +462,19 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   } | null>(null);
   const [modelAdd, setModelAdd] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ key: string; ok?: boolean; steps?: any[]; error?: string; busy: boolean } | null>(null);
-  const TABS = ['integrations', 'config', 'history'] as const;
+  const TABS = ['workers', 'history', 'integrations', 'config'] as const;
   type TabKey = (typeof TABS)[number];
+  // v2 key: the old tab order defaulted to Global config, which made both the
+  // live board and history invisible on first open. A new key deliberately
+  // discards that saved choice so "Workers" is the default view; history is
+  // one click away and no longer shares the live board's screen.
   const [tab, setTab] = useState<TabKey>(() => {
     try {
-      const saved = localStorage.getItem('dsh-adapter-tab');
-      return (TABS as readonly string[]).includes(saved ?? '') ? (saved as TabKey) : 'config';
-    } catch { return 'config'; }
+      const saved = localStorage.getItem('dsh-adapter-tab-v2');
+      return (TABS as readonly string[]).includes(saved ?? '') ? (saved as TabKey) : 'workers';
+    } catch { return 'workers'; }
   });
-  useEffect(() => { try { localStorage.setItem('dsh-adapter-tab', tab); } catch { /* private mode */ } }, [tab]);
+  useEffect(() => { try { localStorage.setItem('dsh-adapter-tab-v2', tab); } catch { /* private mode */ } }, [tab]);
   // Deliberately no default dispatch-target select here: CLI backends stay
   // opt-in per call via the worker argument (see the read-only workerOptIn
   // card below). Re-adding a default would silently re-route every
@@ -629,7 +635,9 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       if (r.ok) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
     }).catch(() => {}).finally(() => setHistoryLoading(false));
   }, [get]);
-  useEffect(() => { loadHistory(); }, [loadHistory]);
+  // History is a separate, collapsed view: fetch it only when that tab is
+  // opened instead of loading a 100-row table on every panel mount.
+  useEffect(() => { if (tab === 'history') loadHistory(); }, [loadHistory, tab]);
 
   const loadJobEvents = useCallback(async (id: string) => {
     try {
@@ -978,30 +986,31 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           setTab(TABS[(index + step) % TABS.length]);
         }}
         style={{
-          position: 'sticky', top: 0, zIndex: 6, display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 2,
-          paddingTop: 4, marginBottom: -1,
-          background: 'Canvas',
-          borderBottom: '1px solid rgba(128,128,128,0.2)',
-          boxShadow: '0 1px 0 rgba(128,128,128,0.06)',
+          position: 'sticky', top: 0, zIndex: 6, display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4, marginBottom: 2,
+          padding: 4, background: 'Canvas',
+          border: '1px solid rgba(128,128,128,0.18)', borderRadius: 10,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         }}>
-        {([['integrations', copy.integrations], ['config', copy.globalConfig], ['history', copy.history]] as const).map(([key, label]) => {
+        {([['workers', copy.workerStatus], ['history', copy.history], ['integrations', copy.integrations], ['config', copy.globalConfig]] as const).map(([key, label]) => {
           const active = tab === key;
           return (
             <button key={key} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
               onClick={() => setTab(key)}
               onMouseEnter={(e: any) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.10)'; }}
-              onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseLeave={(e: any) => { e.currentTarget.style.background = active ? 'rgba(76,141,255,0.14)' : 'transparent'; }}
               style={{
                 display: 'inline-flex', alignItems: 'center', minWidth: 0,
-                padding: '6px 12px', fontSize: 12.5, border: 'none', background: 'transparent',
-                cursor: 'pointer', borderRadius: '6px 6px 0 0',
-                color: active ? 'inherit' : 'rgba(128,128,128,0.9)',
-                fontWeight: active ? 600 : 400,
-                borderBottom: `2px solid ${active ? '#4c8dff' : 'transparent'}`,
-                transition: 'color 120ms ease, border-color 120ms ease, background 120ms ease',
+                padding: '5px 12px', fontSize: 12.5, border: 'none',
+                background: active ? 'rgba(76,141,255,0.14)' : 'transparent',
+                cursor: 'pointer', borderRadius: 8,
+                color: active ? '#4c8dff' : 'inherit',
+                fontWeight: active ? 600 : 500,
+                opacity: active ? 1 : 0.7,
+                boxShadow: active ? 'inset 0 0 0 1px rgba(76,141,255,0.30)' : 'none',
+                transition: 'color 120ms ease, background 120ms ease, opacity 120ms ease',
               }}>
               {label}
-              {key === 'history' && runningJobs > 0 && (
+              {key === 'workers' && runningJobs > 0 && (
                 <span aria-label={String(runningJobs)} style={{
                   marginLeft: 6, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 99,
                   background: '#4c8dff', color: '#fff', fontSize: 10.5, lineHeight: '16px',
@@ -1250,13 +1259,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
               {historyLoading ? copy.loading : copy.historyRefresh}
             </button>
           </div>
-          {historyRows.length === 0 ? (
+          {historyLoading && historyRows.length === 0 ? (
+            <div style={{ opacity: 0.55, fontSize: 12 }}>{copy.loading}</div>
+          ) : historyRows.length === 0 ? (
             <div style={S.emptyBox}>
               <div style={S.emptyTitle}>{copy.historyEmpty}</div>
               <div style={S.emptyHint}>{copy.historyEmptyHint}</div>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', border: '1px solid rgba(128,128,128,0.16)', borderRadius: 10, padding: '0 10px' }}>
               <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
                 <thead>
                   <tr style={{ textAlign: 'left', opacity: 0.6 }}>
@@ -1295,8 +1306,14 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         </div>
       )}
 
-      {tab === 'history' && (<>
-      <div style={S.section}>{copy.jobs}</div>
+      {tab === 'workers' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+            <div style={{ ...S.section, margin: 0 }}>{copy.jobs}</div>
+            {runningJobs > 0 && <span style={S.chip(true)}>{copy.runningCount(runningJobs)}</span>}
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 11, opacity: 0.5 }}>{copy.liveHint}</span>
+          </div>
       {!jobsLoaded ? (
         <div style={{ opacity: 0.55 }}>{copy.loading}</div>
       ) : groups.length === 0 ? (
@@ -1305,7 +1322,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           <div style={S.emptyHint}>{copy.emptyHint}</div>
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', border: '1px solid rgba(128,128,128,0.16)', borderRadius: 10, padding: '0 10px' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed', minWidth: 800 }}>
             <colgroup>
               <col style={{ width: 64 }} /><col style={{ width: 58 }} /><col style={{ width: 72 }} />
@@ -1325,7 +1342,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           </table>
         </div>
       )}
-      </>)}
+        </div>
+      )}
       {hoverTask && createPortal(
         <div style={{
           position: 'fixed', right: hoverTask.right, zIndex: 9999,
