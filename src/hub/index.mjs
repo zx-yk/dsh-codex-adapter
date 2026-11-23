@@ -560,6 +560,56 @@ export function isLoopbackRequest(req) {
   const host = hostHeaderName(req.headers?.host);
   return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || isIpv4Loopback(host);
 }
+
+// A browser request aimed at this loopback listener: it carries the DSH
+// browser cookie, an Origin/Referer, or Fetch-Site metadata. `sec-fetch-mode`
+// is deliberately not listed: Node's own fetch (the bundled MCP client) sends
+// `sec-fetch-mode: cors`, while a browser also sends `sec-fetch-site`.
+const BROWSER_MARKER_HEADERS = ['origin', 'referer', 'cookie', 'sec-fetch-site', 'sec-fetch-dest'];
+
+function hasBrowserMarkers(req) {
+  const headers = req?.headers ?? {};
+  return BROWSER_MARKER_HEADERS.some((name) => headers[name] !== undefined);
+}
+
+/**
+ * DSH's `connection` service is the authority on browser trust. Its
+ * `requestRejection()` applies the Host/Origin fence (defeating DNS rebinding
+ * and cross-site calls) and requires an authenticated live Peer. These routes
+ * used to check only `isLoopbackRequest`, which accepts a request from any Web
+ * page open in the user's browser — a page can reach 127.0.0.1 even though it
+ * cannot read the response, and state-changing POSTs would still run.
+ *
+ * The bundled MCP server is a local non-browser client: it has no browser
+ * cookie, so `requestRejection()` returns 401 for it. A 401 on a plain
+ * loopback request with no browser markers is therefore allowed through; the
+ * MCP process can already do anything the signed-in user can do locally.
+ * Anything carrying browser markers, or coming from a non-loopback peer, is
+ * subject to the rejection unchanged.
+ *
+ * @returns undefined when the request may proceed, otherwise 401 or 403.
+ */
+export function requestRejectionFor(ctx, req) {
+  let connection;
+  try {
+    connection = ctx?.get?.('connection') ?? ctx?.connection;
+  } catch {
+    connection = undefined;
+  }
+  if (connection === undefined || typeof connection?.requestRejection !== 'function') {
+    // Older DSH without the connection service: keep the previous loopback gate.
+    return isLoopbackRequest(req) ? undefined : 403;
+  }
+  let rejection;
+  try {
+    rejection = connection.requestRejection(req);
+  } catch {
+    rejection = 403;
+  }
+  if (rejection === undefined) return undefined;
+  if (rejection === 401 && isLoopbackRequest(req) && !hasBrowserMarkers(req)) return undefined;
+  return rejection;
+}
 function sendJson(res, status, value, headers = {}) {
   const body = JSON.stringify(value);
   res.writeHead(status, {
@@ -727,7 +777,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/worker-probe`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST only' }, { allow: 'POST' });
         if (!(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) return sendJson(res, 415, { ok: false, error: 'application/json required' });
         try {
@@ -741,7 +792,11 @@ export async function apply(ctx) {
 
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/ping`,
-      handler: (req, res) => sendJson(res, 200, { ok: true, service: 'dsh-adapter-hub' }),
+      handler: (req, res) => {
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
+        return sendJson(res, 200, { ok: true, service: 'dsh-adapter-hub' });
+      },
     }));
 
     // WPC14: liveness probe for a ghost job's recorded pid. The panel probes
@@ -751,7 +806,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/proc-alive`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         if (req.method !== 'GET') return sendJson(res, 405, { ok: false, error: 'GET only' }, { allow: 'GET' });
         try {
           const url = new URL(req.url, 'http://localhost');
@@ -773,7 +829,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/proc-kill`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST only' }, { allow: 'POST' });
         try {
           const body = await readBody(req);
@@ -799,7 +856,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'prefix', path: `${ROUTE_BASE}/jobs`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const url = new URL(req.url, 'http://localhost');
           const parts = url.pathname.slice(`${ROUTE_BASE}/jobs`.length).split('/').filter(Boolean);
@@ -858,7 +916,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/config`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const { readGlobalConfig, writeGlobalConfig } = await import(`../install/install.mjs?t=${Date.now()}`);
           if (req.method === 'GET') {
@@ -880,7 +939,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/presets`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const presets = ctx.get('agentPresets');
           if (presets === undefined) return sendJson(res, 200, { ok: true, presets: [] });
@@ -903,7 +963,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/providers`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const { readGlobalConfig } = await import('../install/install.mjs');
           await hub.refreshAutoProviders?.();
@@ -937,7 +998,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/model-caps`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const cfg = readGlobalConfig();
           if (req.method === 'POST') {
@@ -964,7 +1026,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/vision-models`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const url = new URL(req.url, 'http://localhost');
           const provider = url.searchParams.get('provider');
@@ -983,7 +1046,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/provider-test`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST only' });
         try {
           // The entry comes from the panel form so unsaved edits can be probed.
@@ -1001,7 +1065,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/install/status`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const { installStatus } = await import(`../install/install.mjs?t=${Date.now()}`);
           return sendJson(res, 200, { ok: true, status: installStatus() });
@@ -1014,7 +1079,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/install`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'POST only' }, { allow: 'POST' });
         try {
           const { target, statusline } = await readBody(req);
@@ -1051,7 +1117,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/history`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         if (req.method !== 'GET') return sendJson(res, 405, { ok: false, error: 'GET only' });
         try {
           const url = new URL(req.url, 'http://localhost');
@@ -1074,7 +1141,8 @@ export async function apply(ctx) {
     disposers.push(webServer.register({
       kind: 'exact', path: `${ROUTE_BASE}/doctor`,
       handler: async (req, res) => {
-        if (!isLoopbackRequest(req)) return sendJson(res, 403, { ok: false, error: 'loopback only' });
+        const rejection = requestRejectionFor(ctx, req);
+        if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const cfg = hub.getConfig();
           return sendJson(res, 200, {

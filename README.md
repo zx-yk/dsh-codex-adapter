@@ -197,6 +197,7 @@ Pasted images stay visible in the conversation and reach a text-only model as a 
 - **Live board** — grouped by workspace, with status, step, current tool, tokens and a per-job task cell. Click a row to expand its event stream (tool calls with arguments, results, assistant text) and keep it updating every 2s while the job runs.
 - **Durable history** — terminal jobs are appended once to `~/.config/dsh-adapter/history.jsonl` (2000 records / 8 MB cap) and served by `GET /history` with tier / status / source filters, paging and aggregates. Existing status shards are imported on first run.
 - **Guardrails** — worker→worker nesting is capped by an origin chain (default depth 3), and a second writer on a workspace another job holds is refused with the holder's info instead of being queued.
+- **Route trust** — every hub HTTP route first asks DSH's `ctx.connection.requestRejection()` for a verdict (Host/Origin fence plus browser authentication), so a page open in the user's browser cannot drive the loopback API. The bundled MCP client is loopback-only and sends no browser markers, so its local channel keeps working.
 
 ## Architecture
 

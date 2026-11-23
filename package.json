@@ -1,6 +1,6 @@
 {
   "name": "@zoraxylia/dsh-codex-adapter",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "type": "module",
   "main": "./src/hub/index.mjs",
   "description": "Dispatch tasks from Claude Code / Codex to DSH agents as native subagents with live progress; configure dispatch defaults, execution mode, and vision / image-generation access, installed into the host in one click.",

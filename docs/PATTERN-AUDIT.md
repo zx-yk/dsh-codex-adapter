@@ -102,8 +102,9 @@ truncated (full evidence preserved).
 
 Sound elsewhere: provenance (`provider`, cached/native-degradation) on every
 vision answer; proc-kill verifies the command line before signalling and
-refuses pid recycling; loopback-only routes with CORS/nosniff headers; no
-credentials are printed (keys only read into request headers).
+refuses pid recycling; every hub route consults DSH's
+`ctx.connection.requestRejection()` (Host/Origin fence + browser auth) and keeps
+CORS/nosniff headers; no credentials are printed (keys only read into request headers).
 
 ## P6 — coverage illusion
 
