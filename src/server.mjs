@@ -127,6 +127,10 @@ async function acquireDispatchLock({ cwd, backend, mode, allowConcurrent }) {
       return acquireCwdLock({ cwd, jobId: null, backend, mode, startedAt: new Date().toISOString(), allowConcurrent });
     } catch (err) {
       if (!(err instanceof CwdLockError) || attempt > 0 || err.holder.mode !== 'hub') throw err;
+      // The holder may still be inside hub.spawn: its jobId is null until the
+      // spawn response comes back. "null" is not "no such job" — probing it
+      // would release the in-flight lock and let two writers into one cwd.
+      if (typeof err.holder.jobId !== 'string' || err.holder.jobId === '') throw err;
       let settled = false;
       try { settled = (await hub.get(err.holder.jobId, 0)).status !== 'running'; }
       catch (e) { if (String(e?.message ?? e).includes('no such job')) settled = true; }
@@ -402,8 +406,12 @@ server.registerTool('dsh_worker_status', {
   // means the hub answered and has no jobs. Only the latter may release locks:
   // a down hub says nothing about whether its jobs still run.
   const remote = hubUp ? await hub.list().catch(() => null) : null;
-  const remoteJobs = remote ?? [];
-  if (remote !== null) {
+  // Only an actual array is an authoritative answer. A hub that answered 200
+  // without a jobs field yields undefined, which must not be converted to []
+  // and then treated as "the hub has no jobs" (that would release every lock).
+  const arrived = Array.isArray(remote);
+  const remoteJobs = arrived ? remote : [];
+  if (arrived) {
     // The list actually arrived: hub-held locks whose job is settled or gone
     // release now.
     for (const jobId of settledHubLockIds(remoteJobs, getCwdLocks())) releaseCwdLockByJobId(jobId);

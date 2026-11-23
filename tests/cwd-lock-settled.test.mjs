@@ -27,6 +27,18 @@ test('non-hub locks and lock entries without a holder are ignored', () => {
   );
 });
 
+test('a hub lock whose job id is still being backfilled is never stale', () => {
+  // acquireDispatchLock takes the lock with jobId: null, then hub.spawn
+  // returns and updateCwdLockHolder fills the id. A concurrent status poll in
+  // that window must not release the lock: that would let a second writer into
+  // the same workspace while the first worker is still starting.
+  const inFlight = lock(null);
+  assert.deepEqual(settledHubLockIds([], [inFlight]), []);
+  assert.deepEqual(settledHubLockIds([{ id: 'hub-1', status: 'running' }], [inFlight]), []);
+  assert.deepEqual(settledHubLockIds([{ id: 'hub-1', status: 'done' }], [inFlight]), []);
+  assert.deepEqual(settledHubLockIds([], [lock('')]), []);
+});
+
 test('an absent list (hub down) is the caller\'s decision, not something this helper guesses', () => {
   // The server must pass null/undefined only when it will not release at all;
   // this helper sees [] as a real, empty answer from the hub.

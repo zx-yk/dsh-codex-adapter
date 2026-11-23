@@ -38,8 +38,9 @@ export function normalizeCwd(cwd) {
 /** Thrown by acquireCwdLock when another running job holds the cwd. */
 export class CwdLockError extends Error {
   constructor(holder) {
+    const job = holder.jobId ?? '(starting)';
     super(
-      `workspace "${holder.cwd}" is already held by a running worker (job ${holder.jobId}, backend ${holder.backend}, mode ${holder.mode}, started at ${holder.startedAt}). ` +
+      `workspace "${holder.cwd}" is already held by a running worker (job ${job}, backend ${holder.backend}, mode ${holder.mode}, started at ${holder.startedAt}). ` +
       'Refusing this dispatch instead of queueing it: two workers writing the same repo concurrently corrupt files. ' +
       'Wait for that job to settle, cancel it, or pass allow_concurrent_cwd: true if this task is read-only.',
     );
@@ -105,6 +106,11 @@ export function settledHubLockIds(remoteJobs, currentLocks) {
   for (const entry of currentLocks ?? []) {
     const holder = entry?.holder;
     if (holder?.mode !== 'hub') continue;
+    // A hub lock is acquired with jobId: null and backfilled only after
+    // hub.spawn returns. That window is NOT evidence the job is gone:
+    // treating it as stale would release the lock while the first worker is
+    // still starting, letting a second writer into the same workspace.
+    if (typeof holder.jobId !== 'string' || holder.jobId === '') continue;
     const job = byId.get(holder.jobId);
     if (job === undefined || job.status !== 'running') out.push(holder.jobId);
   }
