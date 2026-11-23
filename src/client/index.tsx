@@ -326,12 +326,12 @@ const S = {
     verticalAlign: 'top' as const, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis',
   },
   mono: { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, fontVariantNumeric: 'tabular-nums' as const },
-  // History summary: auto-fit keeps four tiles on a wide panel and two on a
-  // narrow one without a media query or a fixed minimum page width.
-  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: 8, padding: '8px 0 12px', borderBottom: '1px solid rgba(128,128,128,0.18)', minWidth: 0 },
-  stat: { display: 'flex', flexDirection: 'column' as const, gap: 2, border: '1px solid rgba(128,128,128,0.22)', borderRadius: 10, padding: '9px 12px', minWidth: 0 },
-  statLabel: { fontSize: 11.5, opacity: 0.6 },
-  statValue: { fontSize: 17, fontWeight: 600 as const, fontVariantNumeric: 'tabular-nums' as const, overflowWrap: 'anywhere' as const },
+  // History summary: four compact tiles on one row; auto-fit is avoided on
+  // purpose because two rows of oversized cards pushed the table off-screen.
+  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(88px, 118px))', gap: 6, padding: 0, minWidth: 0 },
+  stat: { display: 'flex', flexDirection: 'column' as const, gap: 1, border: '1px solid rgba(128,128,128,0.20)', borderRadius: 8, padding: '5px 9px', minWidth: 0, overflow: 'hidden' },
+  statLabel: { fontSize: 10.5, opacity: 0.55, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' },
+  statValue: { fontSize: 15, fontWeight: 600 as const, fontVariantNumeric: 'tabular-nums' as const, whiteSpace: 'nowrap' as const },
   emptyBox: { border: '1px dashed rgba(128,128,128,0.35)', borderRadius: 10, padding: '20px 14px', textAlign: 'center' as const, fontSize: 12, minWidth: 0 },
   emptyTitle: { fontSize: 12.5, fontWeight: 500 as const, opacity: 0.95, marginBottom: 3 },
   emptyHint: { opacity: 0.65 },
@@ -971,6 +971,18 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   };
 
   const runningJobs = jobsLoaded ? jobs.filter((j: any) => j.status === 'running' && j.originWriterAlive !== false).length : 0;
+  const historyStatusMeta = (status: string) => {
+    if (status === 'done') return { label: copy.statusDone, color: '#3fb950' };
+    if (status === 'failed') return { label: copy.statusFailed, color: '#e5484d' };
+    if (status === 'cancelled') return { label: copy.statusCancelled, color: '#d29922' };
+    return { label: status || '—', color: 'inherit' };
+  };
+  const historyTime = (iso: string | null | undefined) => {
+    const d = new Date(iso ?? '');
+    if (Number.isNaN(d.getTime())) return '—';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, lineHeight: 1.55, width: '100%', minWidth: 0, maxWidth: 1000, margin: '0 auto' }}>
@@ -1245,8 +1257,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
       {tab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
-            <div style={{ ...S.statGrid, flex: '1 1 420px' }} role="status" aria-live="polite">
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ ...S.statGrid }} role="status" aria-live="polite">
               {historyStatItems(historyAgg, copy).map(({ key, label, value }) => (
                 <div key={key} style={S.stat}>
                   <span style={S.statLabel}>{label}</span>
@@ -1254,7 +1266,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                 </div>
               ))}
             </div>
-            <button type="button" style={{ ...S.btn, padding: '2px 10px', alignSelf: 'center', flexShrink: 0 }}
+            <span style={{ flex: 1 }} />
+            <button type="button" style={{ ...S.btn, padding: '4px 10px', alignSelf: 'center', flexShrink: 0 }}
               disabled={historyLoading} onClick={loadHistory}>
               {historyLoading ? copy.loading : copy.historyRefresh}
             </button>
@@ -1268,15 +1281,20 @@ function WorkersPanel({ ctx }: { ctx: any }) {
             </div>
           ) : (
             <div style={{ overflowX: 'auto', border: '1px solid rgba(128,128,128,0.16)', borderRadius: 10, padding: '0 10px' }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 760, tableLayout: 'fixed', fontSize: 12 }}>
+                <colgroup>
+                  <col style={{ width: 138 }} />
+                  <col style={{ width: 86 }} />
+                  <col />
+                  <col style={{ width: 180 }} />
+                  <col style={{ width: 64 }} />
+                  <col style={{ width: 72 }} />
+                </colgroup>
                 <thead>
-                  <tr style={{ textAlign: 'left', opacity: 0.6 }}>
-                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyTime}</th>
-                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyTier}</th>
-                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyModel}</th>
-                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyStatus}</th>
-                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyCost}</th>
-                    <th style={{ padding: '4px 6px', fontWeight: 500 }}>{copy.historyTask}</th>
+                  <tr style={{ textAlign: 'left', background: 'rgba(128,128,128,0.06)', opacity: 0.72 }}>
+                    {[copy.historyTime, copy.historyStatus, copy.historyTask, copy.historyModel, copy.historyTier, copy.historyCost].map((h) => (
+                      <th key={h} style={{ padding: '6px 8px', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -1284,18 +1302,32 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                     const start = Date.parse(r.startedAt ?? '');
                     const end = Date.parse(r.endedAt ?? '');
                     const secs = Number.isFinite(start) && Number.isFinite(end) && end >= start ? ((end - start) / 1000).toFixed(1) + 's' : '—';
-                    const color = r.status === 'failed' ? '#e5484d' : r.status === 'done' ? '#3fb950' : undefined;
+                    const status = historyStatusMeta(r.status);
+                    const model = `${r.model ?? '—'}${r.effort ? ` @${r.effort}` : ''}`;
+                    const task = r.task ?? '';
                     return (
                       <tr key={r.id} style={{ borderTop: '1px solid rgba(128,128,128,0.14)', transition: 'background 120ms ease' }}
                         onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.05)'; }}
                         onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}>
-                        <td style={{ padding: '4px 6px', whiteSpace: 'nowrap' }}>{r.endedAt ? new Date(r.endedAt).toLocaleString() : '—'}</td>
-                        <td style={{ padding: '4px 6px' }}>{r.tier ?? '—'}</td>
-                        <td style={{ padding: '4px 6px' }}>{r.model ?? '—'}{r.effort ? ` @${r.effort}` : ''}</td>
-                        <td style={{ padding: '4px 6px', color }}>{r.status ?? '—'}</td>
-                        <td style={{ padding: '4px 6px', whiteSpace: 'nowrap' }}>{secs}</td>
-                        <td style={{ padding: '4px 6px', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          title={r.task ?? ''}>{r.task ?? '—'}</td>
+                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', opacity: 0.8 }}
+                          title={r.endedAt ? new Date(r.endedAt).toLocaleString() : undefined}>{historyTime(r.endedAt)}</td>
+                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: status.color }}>
+                            <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                            {status.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '6px 8px', minWidth: 0, overflow: 'hidden' }} title={task || undefined}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task || '—'}</div>
+                        </td>
+                        <td style={{ padding: '6px 8px', minWidth: 0, overflow: 'hidden' }} title={model}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.model ?? '—'}</span>
+                            {r.effort && <span style={{ flexShrink: 0, fontSize: 10.5, opacity: 0.55 }}>@{r.effort}</span>}
+                          </div>
+                        </td>
+                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{r.tier ?? '—'}</td>
+                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{secs}</td>
                       </tr>
                     );
                   })}
