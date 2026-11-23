@@ -18,7 +18,7 @@ import { prepareSandboxTemp } from './sandbox-temp.mjs';
 // switch to the plugin's own directory before any dispatch.
 const sandboxTemp = prepareSandboxTemp();
 
-const server = new McpServer({ name: 'dsh-adapter', version: '0.1.31' });
+const server = new McpServer({ name: 'dsh-adapter', version: '0.1.32' });
 
 const tierSchema = z.enum(['flash', 'pro']).optional().describe('Worker model tier. flash = mechanical, well-scoped work (single-file edits, lookups, formatting); pro = multi-file changes, debugging, design judgment. Omit to use the session default. Ignored when worker= is set.');
 const effortSchema = z.enum(['off', 'high', 'max']).optional().describe('Reasoning effort for the worker. Omit to use the session default. With worker= it only applies when passed explicitly and the profile supports it (agy maps to low/medium/high).');
