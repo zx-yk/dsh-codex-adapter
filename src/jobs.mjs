@@ -278,13 +278,21 @@ export async function waitJob(id, timeoutMs) {
   if (!job) throw new Error(`no such job: ${id}`);
   if (job.status !== 'running') return job;
   let timer;
-  await Promise.race([
-    new Promise((res) => job.waiters.push(res)),
-    timeoutMs ? new Promise((res) => { timer = setTimeout(res, timeoutMs); }) : new Promise(() => {}),
-  ]);
-  // The losing branch's timer would otherwise pin the event loop for its full
-  // remaining duration and delay server exit after a job settles.
-  if (timer) clearTimeout(timer);
+  let resolveWaiter;
+  const waiter = new Promise((res) => { resolveWaiter = res; job.waiters.push(res); });
+  try {
+    await Promise.race([
+      waiter,
+      timeoutMs ? new Promise((res) => { timer = setTimeout(res, timeoutMs); }) : new Promise(() => {}),
+    ]);
+  } finally {
+    // The losing branch's timer would otherwise pin the event loop for its full
+    // remaining duration and delay server exit after a job settles. A timed-out
+    // poll must also drop its waiter instead of accumulating one per call.
+    if (timer) clearTimeout(timer);
+    const at = job.waiters.indexOf(resolveWaiter);
+    if (at !== -1) job.waiters.splice(at, 1);
+  }
   return job;
 }
 

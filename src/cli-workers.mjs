@@ -45,13 +45,32 @@ const STDERR_TAIL_BYTES = 4_096;
 
 let nextCliId = 1;
 
-/** SIGTERM the process group, SIGKILL it after a grace period. Never throws. */
-export function killGroup(child) {
-  try { process.kill(-child.pid, 'SIGTERM'); } catch {}
-  const t = setTimeout(() => {
-    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+/**
+ * SIGTERM the process group, SIGKILL it after a grace period. Never throws.
+ *
+ * Windows has no POSIX process groups: process.kill(-pid) fails with ESRCH
+ * and the child (and every timeout/cancel) would silently leave the CLI
+ * process running. Signal the child itself there. `child.kill` terminates the
+ * direct CLI process; the detach semantics still apply on POSIX.
+ * Options are injectable for tests.
+ */
+export function killGroup(child, {
+  platform = process.platform,
+  kill = process.kill,
+  childKill = (signal) => child.kill?.(signal),
+  schedule = setTimeout,
+} = {}) {
+  if (platform === 'win32') {
+    try { childKill('SIGTERM'); } catch {}
+    const t = schedule(() => { try { childKill('SIGKILL'); } catch {} }, SIGKILL_GRACE_MS);
+    t?.unref?.();
+    return;
+  }
+  try { kill(-child.pid, 'SIGTERM'); } catch {}
+  const t = schedule(() => {
+    try { kill(-child.pid, 'SIGKILL'); } catch {}
   }, SIGKILL_GRACE_MS);
-  t.unref?.();
+  t?.unref?.();
 }
 
 function usageToTokens(u) {
@@ -188,6 +207,17 @@ function handleGrokLine(job, line, msg) {
     job.error = msg.error?.message ?? JSON.stringify(msg.error);
     return;
   }
+}
+
+/**
+ * Final text for a CLI run that ended without a `result` event. agy streams
+ * into `_text`; grok's text arrives as whole assistant messages in
+ * `_msgText`, so `??` is wrong: `_text` is initialised to '' and would win,
+ * reporting the final answer as empty.
+ */
+export function cliFallbackText(job) {
+  if (job?.result != null) return job.result;
+  return job?._text || job?._msgText || '';
 }
 
 function touchActivity(job) {
@@ -376,7 +406,7 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
       } else if (code === 0) {
         // Stream ended without a result event: fall back to accumulated text
         // and the last per-message usage we saw.
-        job.result = job._text ?? job._msgText ?? '';
+        job.result = cliFallbackText(job);
         if (job._msgUsage) addTokensFromUsage(job, job._msgUsage);
         job.stopReason = job._stopReason ?? 'completed';
         settle(job, { status: 'done', stopReason: job.stopReason });

@@ -89,3 +89,24 @@ export function releaseCwdLockByJobId(jobId) {
 export function getCwdLocks() {
   return [...locks.entries()].map(([cwd, holder]) => ({ cwd, holder: { ...holder } }));
 }
+
+/**
+ * Job ids whose hub-held locks are provably stale, given one authoritative job
+ * list from the hub. A lock is stale when its job is absent from that list or
+ * is no longer running. Callers must only pass a list that actually arrived:
+ * an empty array from a failed fetch would release every hub lock and defeat
+ * the same-workspace guardrail.
+ */
+export function settledHubLockIds(remoteJobs, currentLocks) {
+  // No array means no authoritative answer; never turn that into "release all".
+  if (!Array.isArray(remoteJobs)) return [];
+  const byId = new Map(remoteJobs.map((j) => [j?.id, j]));
+  const out = [];
+  for (const entry of currentLocks ?? []) {
+    const holder = entry?.holder;
+    if (holder?.mode !== 'hub') continue;
+    const job = byId.get(holder.jobId);
+    if (job === undefined || job.status !== 'running') out.push(holder.jobId);
+  }
+  return out;
+}

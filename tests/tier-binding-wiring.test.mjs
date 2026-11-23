@@ -21,14 +21,19 @@ const jobs = read('src/jobs.mjs');
 const hubClient = read('src/hub-client.mjs');
 const jobsStandalone = read('src/jobs.mjs');
 
-/** Every line that opens this call must also pass the binding. */
+/**
+ * Every call site (and the few lines of its argument list) must pass the
+ * binding. The spec is now assembled by hubSpawnSpec, so the call itself is
+ * hub.spawn(hubSpawnSpec({ ... })) rather than a bare object literal.
+ */
 function callSitesCarryBinding(source, needle) {
-  const lines = source.split('\n').filter((l) => l.includes(needle));
-  return lines.length > 0 && lines.every((l) => l.includes('bindingForTier'));
+  const lines = source.split('\n');
+  const starts = lines.map((line, index) => (line.includes(needle) ? index : -1)).filter((index) => index !== -1);
+  return starts.length > 0 && starts.every((index) => lines.slice(index, index + 8).join('\n').includes('bindingForTier'));
 }
 
 test('every hub dispatch carries the tier binding', () => {
-  assert.ok(callSitesCarryBinding(server, 'hub.spawn({'));
+  assert.ok(callSitesCarryBinding(server, 'hub.spawn('));
 });
 
 test('every standalone dispatch carries the tier binding', () => {

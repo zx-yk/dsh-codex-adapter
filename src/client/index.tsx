@@ -5,6 +5,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { persistConfigPatch } from './config-save.mjs';
+import { historyStatItems } from './history-view.mjs';
 
 import { reconcileGhosts, displayJobs, groupJobs, workspaceKey, basenameOf, abbrevPath, workspaceLocks, lockBadgeOf, statusInfoOf, ghostPidOf, procBadgeOf, dueProcProbes } from './jobs-view';
 
@@ -137,8 +138,8 @@ const COPY = {
     cardMM: { t: '视觉与生图', d: '给纯文本的 DSH 模型借来眼睛和画笔：describe_image、会话贴图转写与 generate_image 都用这里的设置。' },
     cardCustomProv: { t: '自定义 Provider', d: '接入自己的 API 或本地命令；保存后会出现在上面的视觉 / 生图 provider 选择里。' },
     modeDesc: { hub: 'hub · 默认（在 DSH 内运行）', auto: 'auto · 回退独立进程（需源码依赖）', standalone: 'standalone · 独立进程（需源码依赖）' },
-    save: '保存', saved: '已保存', saveFailed: '保存失败，已恢复服务器中的配置：', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。',
-    history: '历史看板', historyEmpty: '还没有历史记录。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
+    save: '保存', saved: '已保存', saveFailed: '保存失败，已恢复服务器中的配置：', jobs: '实时 Worker 任务', empty: '当前没有 worker 任务。', emptyHint: '派发任务后，这里会实时显示进度。', loading: '加载中…',
+    history: '历史看板', historyEmpty: '还没有历史记录', historyEmptyHint: '完成的 Worker 任务会显示在这里。', historyTotal: '总数', historyDone: '成功', historyFailed: '失败',
     historyAvg: '平均耗时', historyRefresh: '刷新', historyTime: '时间', historyTier: '档位', historyModel: '模型',
     historyStatus: '状态', historyCost: '耗时', historyTask: '任务',
     eventsTitle: '事件流', eventsEmpty: '还没有事件。', eventsOnlyHub: '只有 hub 任务有事件流。', eventsHint: '点击行展开事件流',
@@ -241,8 +242,8 @@ const COPY = {
     cardMM: { t: 'Vision & image generation', d: "Lends the harness's text-only models eyes and a brush: describe_image, pasted-image transcription and generate_image all use these settings." },
     cardCustomProv: { t: 'Custom providers', d: 'Bring your own API or local command; saved providers appear in the vision / image-gen selects above.' },
     modeDesc: { hub: 'hub · default (runs inside DSH)', auto: 'auto · fall back to standalone (source checkout)', standalone: 'standalone (source checkout)' },
-    save: 'Save', saved: 'Saved', saveFailed: 'Save failed; restored the server configuration:', jobs: 'Live worker jobs', empty: 'No worker jobs yet.',
-    history: 'History', historyEmpty: 'No history yet.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
+    save: 'Save', saved: 'Saved', saveFailed: 'Save failed; restored the server configuration:', jobs: 'Live worker jobs', empty: 'No worker jobs yet.', emptyHint: 'Dispatched jobs appear here with live progress.', loading: 'Loading…',
+    history: 'History', historyEmpty: 'No history yet', historyEmptyHint: 'Finished worker jobs will appear here.', historyTotal: 'Total', historyDone: 'Done', historyFailed: 'Failed',
     historyAvg: 'Avg duration', historyRefresh: 'Refresh', historyTime: 'Time', historyTier: 'Tier', historyModel: 'Model',
     historyStatus: 'Status', historyCost: 'Duration', historyTask: 'Task',
     eventsTitle: 'Events', eventsEmpty: 'No events yet.', eventsOnlyHub: 'Only hub jobs expose an event stream.', eventsHint: 'Click a row to expand its event stream',
@@ -321,6 +322,15 @@ const S = {
     verticalAlign: 'top' as const, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis',
   },
   mono: { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, fontVariantNumeric: 'tabular-nums' as const },
+  // History summary: auto-fit keeps four tiles on a wide panel and two on a
+  // narrow one without a media query or a fixed minimum page width.
+  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))', gap: 8, padding: '8px 0 12px', borderBottom: '1px solid rgba(128,128,128,0.18)', minWidth: 0 },
+  stat: { display: 'flex', flexDirection: 'column' as const, gap: 2, border: '1px solid rgba(128,128,128,0.22)', borderRadius: 10, padding: '9px 12px', minWidth: 0 },
+  statLabel: { fontSize: 11.5, opacity: 0.6 },
+  statValue: { fontSize: 17, fontWeight: 600 as const, fontVariantNumeric: 'tabular-nums' as const, overflowWrap: 'anywhere' as const },
+  emptyBox: { border: '1px dashed rgba(128,128,128,0.35)', borderRadius: 10, padding: '20px 14px', textAlign: 'center' as const, fontSize: 12, minWidth: 0 },
+  emptyTitle: { fontSize: 12.5, fontWeight: 500 as const, opacity: 0.95, marginBottom: 3 },
+  emptyHint: { opacity: 0.65 },
 };
 
 const VISION_MODELS: Record<string, string[]> = {
@@ -440,6 +450,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [jobEvents, setJobEvents] = useState<Record<string, { items: any[]; status?: string; stale?: number | null }>>({});
   const jobCursor = useRef<Record<string, number>>({});
   const [historyAgg, setHistoryAgg] = useState<any>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [provForm, setProvForm] = useState<{
     originalId?: string; name: string; type: 'api' | 'cli'; models: string;
     base_url: string; api_key: string; imagegen_model: string;
@@ -611,9 +622,10 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     return save;
   }, [post, get, copy]);
   const loadHistory = useCallback(() => {
+    setHistoryLoading(true);
     void get('/history?limit=100').then((r) => {
       if (r.ok) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setHistoryLoading(false));
   }, [get]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
@@ -1110,8 +1122,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
             <div style={{ fontSize: 12, opacity: 0.5 }}>{copy.noCustomProviders}</div>
           )}
           {customProviders.map((p) => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-              <span style={{ fontWeight: 500 }}>{p.name || p.id}</span>
+            <div key={p.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 12.5, minWidth: 0 }}>
+              <span style={{ fontWeight: 500, minWidth: 0, overflowWrap: 'anywhere' }}>{p.name || p.id}</span>
               <span style={{ ...S.chip(false), opacity: 0.7 }}>{provType(p) === 'api' ? 'API' : 'CLI'}</span>
               {canSee(p) && <span style={S.chip(true)}>{copy.capVision}</span>}
               {canDraw(p) && <span style={S.chip(true)}>{copy.capImagegen}</span>}
@@ -1208,16 +1220,25 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
       {tab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
-            <span>{copy.historyTotal}: <b>{historyAgg?.total ?? 0}</b></span>
-            <span>{copy.historyDone}: <b>{historyAgg?.done ?? 0}</b></span>
-            <span>{copy.historyFailed}: <b>{historyAgg?.failed ?? 0}</b></span>
-            <span>{copy.historyAvg}: <b>{historyAgg?.avgSeconds ?? 0}s</b></span>
-            <span style={{ flex: 1 }} />
-            <button type="button" style={{ ...S.btn, padding: '2px 8px' }} onClick={loadHistory}>{copy.historyRefresh}</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+            <div style={{ ...S.statGrid, flex: '1 1 420px' }} role="status" aria-live="polite">
+              {historyStatItems(historyAgg, copy).map(({ key, label, value }) => (
+                <div key={key} style={S.stat}>
+                  <span style={S.statLabel}>{label}</span>
+                  <strong style={S.statValue}>{value}</strong>
+                </div>
+              ))}
+            </div>
+            <button type="button" style={{ ...S.btn, padding: '2px 10px', alignSelf: 'center', flexShrink: 0 }}
+              disabled={historyLoading} onClick={loadHistory}>
+              {historyLoading ? copy.loading : copy.historyRefresh}
+            </button>
           </div>
           {historyRows.length === 0 ? (
-            <div style={{ opacity: 0.55, fontSize: 12 }}>{copy.historyEmpty}</div>
+            <div style={S.emptyBox}>
+              <div style={S.emptyTitle}>{copy.historyEmpty}</div>
+              <div style={S.emptyHint}>{copy.historyEmptyHint}</div>
+            </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
@@ -1260,8 +1281,13 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
       {tab === 'history' && (<>
       <div style={S.section}>{copy.jobs}</div>
-      {!jobsLoaded || groups.length === 0 ? (
-        <div style={{ opacity: 0.55 }}>{copy.empty}</div>
+      {!jobsLoaded ? (
+        <div style={{ opacity: 0.55 }}>{copy.loading}</div>
+      ) : groups.length === 0 ? (
+        <div style={S.emptyBox}>
+          <div style={S.emptyTitle}>{copy.empty}</div>
+          <div style={S.emptyHint}>{copy.emptyHint}</div>
+        </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed', minWidth: 800 }}>

@@ -192,13 +192,19 @@ export function workspaceKey(cwd: string | null | undefined): string {
   return 'w' + h.toString(16).padStart(8, '0');
 }
 
-/** Directory basename for the group header ("/a/b/c/" → "c", "/" → "/", null → ''). */
+/**
+ * Directory basename for the group header ("/a/b/c/" → "c", "/" → "/",
+ * "D:\\repo\\sub" → "sub", null → ''). Both separators are understood because
+ * worker cwds may be Windows paths even when the panel runs elsewhere.
+ */
 export function basenameOf(cwd: string | null | undefined): string {
   if (cwd == null || cwd === '') return '';
   const s = String(cwd);
-  if (/^\/+$/.test(s)) return '/';
-  const trimmed = s.replace(/\/+$/, '');
-  const i = trimmed.lastIndexOf('/');
+  if (/^[\\/]+$/.test(s)) return s.includes('\\') ? '\\' : '/';
+  // A bare drive root ("D:\" / "C:/") has no component to return.
+  if (/^[A-Za-z]:[\\/]+$/.test(s)) return s.slice(0, 2) + (s.includes('\\') ? '\\' : '/');
+  const trimmed = s.replace(/[\\/]+$/, '');
+  const i = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
   return i < 0 ? trimmed : trimmed.slice(i + 1);
 }
 
@@ -211,8 +217,11 @@ export function basenameOf(cwd: string | null | undefined): string {
 export function abbrevPath(p: any, home?: string | null): string {
   let s = String(p ?? '');
   if (home) {
+    // Match the separator the home path itself uses: a Windows cwd is
+    // "C:\Users\me\repo", not "C:\Users\me/repo".
+    const sep = String(home).includes('\\') && !String(home).includes('/') ? '\\' : '/';
     if (s === home) return '~';
-    if (s.startsWith(home + '/')) s = '~' + s.slice(home.length);
+    if (s.startsWith(home + sep)) s = '~' + s.slice(home.length);
   }
   if (s.length <= 44) return s;
   return s.slice(0, 16) + '…' + s.slice(-26);

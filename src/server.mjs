@@ -8,7 +8,8 @@ import { hubAvailable, hub } from './hub-client.mjs';
 import { startCliJob } from './cli-workers.mjs';
 import { listProfiles, resolveProfile } from './worker-profiles.mjs';
 import { readInheritedOrigin, extendOrigin, DEFAULT_ORIGIN_DEPTH_LIMIT } from './origin-guard.mjs';
-import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks, CwdLockError } from './cwd-lock.mjs';
+import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks, settledHubLockIds, CwdLockError } from './cwd-lock.mjs';
+import { hubSpawnSpec } from './dispatch-spec.mjs';
 import { resolveWorkerCwd } from './paths.mjs';
 import { detectOrchestrator } from './process-info.mjs';
 import { prepareSandboxTemp } from './sandbox-temp.mjs';
@@ -17,7 +18,7 @@ import { prepareSandboxTemp } from './sandbox-temp.mjs';
 // switch to the plugin's own directory before any dispatch.
 const sandboxTemp = prepareSandboxTemp();
 
-const server = new McpServer({ name: 'dsh-adapter', version: '0.1.28' });
+const server = new McpServer({ name: 'dsh-adapter', version: '0.1.29' });
 
 const tierSchema = z.enum(['flash', 'pro']).optional().describe('Worker model tier. flash = mechanical, well-scoped work (single-file edits, lookups, formatting); pro = multi-file changes, debugging, design judgment. Omit to use the session default. Ignored when worker= is set.');
 const effortSchema = z.enum(['off', 'high', 'max']).optional().describe('Reasoning effort for the worker. Omit to use the session default. With worker= it only applies when passed explicitly and the profile supports it (agy maps to low/medium/high).');
@@ -200,7 +201,11 @@ server.registerTool('dsh_run_worker', {
       }
       let spawned;
       try {
-        spawned = await hub.spawn({ task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR, preset: presetForTier(t), timeout_seconds: timeout, ...bindingForTier(t), origin_chain: origin.origin.chain, origin_depth: origin.origin.depth });
+        spawned = await hub.spawn(hubSpawnSpec({
+          task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR,
+          preset: presetForTier(t), timeoutSeconds: timeout,
+          binding: bindingForTier(t), origin: origin.origin,
+        }));
         updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
         hubOrigins.set(spawned.id, origin.origin);
       } catch (err) {
@@ -332,13 +337,16 @@ server.registerTool('dsh_spawn_worker', {
   if (!sessionConfig.enabled) return dispatchDisabled();
   const workDir = resolveWorkerCwd(cwd);
   const depthLimit = depthLimitNow();
+  // This tool starts the job and returns immediately, so the cap is the
+  // session default (there is no per-call timeout_seconds in its schema).
+  const timeout = sessionConfig.default_timeout_seconds;
   if (worker) {
     // CLI profile dispatch; no hub/standalone involvement, no tier policy.
     const profile = resolveProfile(worker);
     const origin = extendOrigin({ inherited: INHERITED_ORIGIN, backend: profile.backend, cwd: workDir, source: ORCHESTRATOR, depthLimit });
     if (!origin.ok) return originRefusal(origin);
     try {
-      const job = await startCliJob({ worker, task, cwd: workDir, source: ORCHESTRATOR, effort, origin: origin.origin, allowConcurrentCwd: !!allow_concurrent_cwd });
+      const job = await startCliJob({ worker, task, cwd: workDir, timeoutMs: timeout * 1000, source: ORCHESTRATOR, effort, origin: origin.origin, allowConcurrentCwd: !!allow_concurrent_cwd });
       return text(jobView(job));
     } catch (err) {
       if (err instanceof CwdLockError) return text({ error: err.message, rejected_by: 'cwd-lock', holder: err.holder });
@@ -359,7 +367,11 @@ server.registerTool('dsh_spawn_worker', {
     }
     let spawned;
     try {
-      spawned = await hub.spawn({ task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR, preset: presetForTier(t), timeout_seconds: timeout, ...bindingForTier(t), origin_chain: origin.origin.chain, origin_depth: origin.origin.depth });
+      spawned = await hub.spawn(hubSpawnSpec({
+        task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR,
+        preset: presetForTier(t), timeoutSeconds: timeout,
+        binding: bindingForTier(t), origin: origin.origin,
+      }));
       updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
       hubOrigins.set(spawned.id, origin.origin);
     } catch (err) {
@@ -372,7 +384,7 @@ server.registerTool('dsh_spawn_worker', {
   const origin = extendOrigin({ inherited: INHERITED_ORIGIN, backend: 'standalone', cwd: workDir, source: ORCHESTRATOR, depthLimit });
   if (!origin.ok) return originRefusal(origin);
   try {
-    const job = await startJob({ task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR, origin: origin.origin, allowConcurrentCwd: !!allow_concurrent_cwd, ...bindingForTier(t) });
+    const job = await startJob({ task, tier: t, effort: e, cwd: workDir, timeoutMs: timeout * 1000, source: ORCHESTRATOR, origin: origin.origin, allowConcurrentCwd: !!allow_concurrent_cwd, ...bindingForTier(t) });
     return text(jobView(job));
   } catch (err) {
     if (err instanceof CwdLockError) return text({ error: err.message, rejected_by: 'cwd-lock', holder: err.holder });
@@ -386,18 +398,15 @@ server.registerTool('dsh_worker_status', {
   inputSchema: {},
 }, async () => {
   const hubUp = await hubAvailable();
-  const remote = hubUp ? await hub.list().catch(() => null) : [];
+  // null means "the list did not arrive" (hub down or the fetch failed); []
+  // means the hub answered and has no jobs. Only the latter may release locks:
+  // a down hub says nothing about whether its jobs still run.
+  const remote = hubUp ? await hub.list().catch(() => null) : null;
   const remoteJobs = remote ?? [];
   if (remote !== null) {
     // The list actually arrived: hub-held locks whose job is settled or gone
-    // release now. A failed fetch (remote === null) must NOT release locks —
-    // a down hub says nothing about whether its jobs still run.
-    const byId = new Map(remoteJobs.map((j) => [j.id, j]));
-    for (const l of getCwdLocks()) {
-      if (l.holder.mode !== 'hub') continue;
-      const j = byId.get(l.holder.jobId);
-      if (j === undefined || j.status !== 'running') releaseCwdLockByJobId(l.holder.jobId);
-    }
+    // release now.
+    for (const jobId of settledHubLockIds(remoteJobs, getCwdLocks())) releaseCwdLockByJobId(jobId);
   }
   for (const j of remoteJobs) attachOrigin(j, j.id);
   const local = listJobs().map((j) => jobView(j));

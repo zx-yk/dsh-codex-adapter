@@ -108,12 +108,17 @@ const RESULT_SCHEMA = {
   additionalProperties: false,
 };
 
+/** `--model` args for claude; "default" means "let the CLI choose". */
+export function claudeModelArgs(model) {
+  return model && model !== 'default' ? ['--model', String(model)] : [];
+}
+
 async function describeViaClaude(model, imagePath, question) {
   const prompt = `Use your Read tool to view the image file at ${imagePath}, then answer concisely: ${question}. Reply with the answer only — no preamble.`;
   const { dirname } = await import('node:path');
   // NOTE: --allowedTools is variadic and would swallow a trailing prompt, so
   // the prompt rides directly on -p.
-  return (await run('claude', ['-p', prompt, '--model', model, '--allowedTools', 'Read'], {
+  return (await run('claude', ['-p', prompt, ...claudeModelArgs(model), '--allowedTools', 'Read'], {
     timeoutMs: 180_000, cwd: dirname(imagePath),
   })).trim();
 }
@@ -153,6 +158,20 @@ async function describeViaAgy(imagePath, question, model) {
 
 /** Shell-quote a value for interpolation into a custom command template. */
 function shq(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
+
+/**
+ * API key for a custom provider. A blank `api_key` is not a key: fall through
+ * to `api_key_env` (the environment or DSH's credential store), exactly as
+ * `testProvider` reports and the README promises. `??` here used to keep the
+ * empty string and send no Authorization header at all.
+ */
+export function resolveApiKey(entry, env = process.env) {
+  const direct = typeof entry?.api_key === 'string' ? entry.api_key.trim() : '';
+  if (direct !== '') return direct;
+  const name = typeof entry?.api_key_env === 'string' ? entry.api_key_env.trim() : '';
+  if (name === '') return undefined;
+  return env[name] ?? readCredentialRef(name);
+}
 
 const BUILTIN_VISION = ['claude-code', 'codex', 'grok', 'agy'];
 const BUILTIN_IMAGEGEN = ['codex', 'agy', 'grok'];
@@ -203,8 +222,7 @@ async function describeViaApi(entry, imagePath, question, model) {
   const m = model && model !== 'default' ? model : entry.models?.[0];
   if (!m) throw new Error(tr(`自定义 provider "${entry.name ?? entry.id}" 未配置模型列表，无法确定视觉模型`, `Custom provider "${entry.name ?? entry.id}" has no models configured`));
   const b64 = readFileSync(imagePath).toString('base64');
-  const apiKey = entry.api_key
-    ?? (entry.api_key_env ? (process.env[entry.api_key_env] ?? readCredentialRef(entry.api_key_env)) : undefined);
+  const apiKey = resolveApiKey(entry);
   const data = await fetchJson(`${base}/chat/completions`, {
     apiKey,
     timeoutMs: 240_000,
@@ -257,7 +275,7 @@ async function generateViaApi(entry, prompt, outputPath, size) {
     `Custom provider "${entry.name ?? entry.id}" has no image-gen model (fill in "Image-gen model" under Settings → DSH Adapter → Custom providers)`));
   const body = { model: m, prompt, n: 1 };
   if (size && /^\d+x\d+$/.test(size)) body.size = size;
-  const data = await fetchJson(`${base}/images/generations`, { apiKey: entry.api_key, timeoutMs: 480_000, body });
+  const data = await fetchJson(`${base}/images/generations`, { apiKey: resolveApiKey(entry), timeoutMs: 480_000, body });
   const item = data?.data?.[0];
   let buf;
   if (item?.b64_json) buf = Buffer.from(item.b64_json, 'base64');
@@ -425,14 +443,15 @@ export async function testProvider(entry, lang) {
   if (type === 'api') {
     let base;
     try { base = apiBase(entry); } catch (err) { push(tr('配置', 'Configuration'), false, err.message); return { ok: false, steps }; }
-    push(tr('配置', 'Configuration'), true, `${base}${entry.api_key ? tr(' · 带 API Key', ' · with API key') : tr(' · 无 Key（不发送 Authorization）', ' · no key (no Authorization header)')}`);
+    const apiKey = resolveApiKey(entry);
+    push(tr('配置', 'Configuration'), true, `${base}${apiKey ? tr(' · 带 API Key', ' · with API key') : tr(' · 无 Key（不发送 Authorization）', ' · no key (no Authorization header)')}`);
 
     // 1. Reachability + auth, via the optional /models endpoint.
     try {
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), 20_000);
       const res = await fetch(`${base}/models`, {
-        headers: entry.api_key ? { authorization: `Bearer ${entry.api_key}` } : {},
+        headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
         signal: ctl.signal,
       }).finally(() => clearTimeout(t));
       const text = await res.text();

@@ -35,12 +35,25 @@ function readText(file) {
  * Leaves every other section byte-for-byte intact. Returns input unchanged
  * when the section is absent.
  */
+function tomlTableName(line) {
+  const m = /^\s*\[([^\]]+)\]/.exec(line);
+  return m ? m[1].trim() : null;
+}
+
 function removeTomlSection(toml, header) {
   const lines = toml.split('\n');
   const start = lines.findIndex((l) => l.trim() === '[' + header + ']');
   if (start === -1) return toml;
+  // A table owns its sub-tables: [x] followed by [x.env] is one block. Stop
+  // only at a table that is neither, otherwise removing [x] would leave an
+  // orphan [x.env] behind (and re-adding [x] would then duplicate it).
   let end = start + 1;
-  while (end < lines.length && !/^\s*\[/.test(lines[end])) end++;
+  for (;;) {
+    const section = end < lines.length ? tomlTableName(lines[end]) : null;
+    if (section !== null && section !== header && !section.startsWith(header + '.')) break;
+    if (end >= lines.length) break;
+    end++;
+  }
   while (end < lines.length && lines[end].trim() === '') end++;
   lines.splice(start, end - start);
   return lines.join('\n');
@@ -377,24 +390,38 @@ function resolveNodeLauncher() {
   return { command: 'node', source: 'fallback' };
 }
 
-function upsertCodexMcp(text, serverPath, launcher = { command: 'node', source: 'fallback' }) {
+/** End (exclusive) of the dsh-adapter MCP table and its sub-tables. */
+function codexMcpEnd(lines, start) {
+  let end = start + 1;
+  for (;;) {
+    const section = end < lines.length ? tomlTableName(lines[end]) : null;
+    if (section !== null && section !== 'mcp_servers.dsh-adapter' && !section.startsWith('mcp_servers.dsh-adapter.')) break;
+    if (end >= lines.length) break;
+    end += 1;
+  }
+  return end;
+}
+
+export function upsertCodexMcp(text, serverPath, launcher = { command: 'node', source: 'fallback' }) {
   const block = codexMcpBlock(serverPath, launcher);
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
   if (start === -1) return (text.trimEnd() ? text.trimEnd() + '\n\n' : '') + block;
-  let end = start + 1;
-  while (end < lines.length && !/^\s*\[/.test(lines[end])) end += 1;
+  // Replace the whole table INCLUDING [mcp_servers.dsh-adapter.env]. Otherwise
+  // a launcher change leaves the old env behind, and an Electron launcher
+  // (which writes its own env table) produces a duplicate TOML table that no
+  // longer parses.
+  const end = codexMcpEnd(lines, start);
   const before = lines.slice(0, start).join('\n').trimEnd();
   const after = lines.slice(end).join('\n').trim();
   return [before, block.trimEnd(), after].filter(Boolean).join('\n\n') + '\n';
 }
 
-function removeCodexMcp(text) {
+export function removeCodexMcp(text) {
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
   if (start === -1) return text;
-  let end = start + 1;
-  while (end < lines.length && !/^\s*\[/.test(lines[end])) end += 1;
+  const end = codexMcpEnd(lines, start);
   return [...lines.slice(0, start), ...lines.slice(end)].join('\n');
 }
 

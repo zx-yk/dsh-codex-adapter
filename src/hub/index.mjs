@@ -489,10 +489,24 @@ export class WorkerRegistry {
     const job = this.jobs.get(id);
     if (!job) return undefined;
     if (job.status !== 'running') return job;
-    await Promise.race([
-      new Promise((res) => job.waiters.push(res)),
-      timeoutMs > 0 ? new Promise((res) => setTimeout(res, timeoutMs)) : Promise.resolve(),
-    ]);
+    let timer;
+    let resolveWaiter;
+    const waiter = new Promise((res) => { resolveWaiter = res; job.waiters.push(res); });
+    try {
+      await Promise.race([
+        waiter,
+        timeoutMs > 0
+          ? new Promise((res) => { timer = setTimeout(res, timeoutMs); timer.unref?.(); })
+          : Promise.resolve(),
+      ]);
+    } finally {
+      // A long-poll that timed out must not leave its timer or its waiter
+      // behind: one is an event-loop handle, the other grows the job's waiter
+      // list for as long as the job runs (every poll added one before).
+      if (timer) clearTimeout(timer);
+      const at = job.waiters.indexOf(resolveWaiter);
+      if (at !== -1) job.waiters.splice(at, 1);
+    }
     return job;
   }
 
@@ -518,17 +532,31 @@ export class WorkerRegistry {
 
 // ---------- loopback route helpers (pattern from dsh-noema) ----------
 
-function isIpv4Loopback(a) { return /^127(\.\d{1,3}){3}$/.test(a); }
-function isLoopbackAddress(address) {
+export function isIpv4Loopback(a) { return /^127(\.\d{1,3}){3}$/.test(a); }
+export function isLoopbackAddress(address) {
   if (!address) return false;
   const n = address.toLowerCase().split('%', 1)[0];
   if (n === '::1' || isIpv4Loopback(n)) return true;
   if (!n.startsWith('::ffff:')) return false;
   return isIpv4Loopback(n.slice(7));
 }
-function isLoopbackRequest(req) {
+/**
+ * Host header without its port. IPv6 literals keep their brackets: splitting
+ * "[::1]:59306" on every colon yields "[" and would reject every request the
+ * browser makes to an IPv6 loopback origin.
+ */
+export function hostHeaderName(value) {
+  const host = String(value ?? '').trim().toLowerCase();
+  if (host.startsWith('[')) {
+    const close = host.indexOf(']');
+    return close === -1 ? host : host.slice(0, close + 1);
+  }
+  const colon = host.indexOf(':');
+  return colon === -1 ? host : host.slice(0, colon);
+}
+export function isLoopbackRequest(req) {
   if (!isLoopbackAddress(req.socket?.remoteAddress)) return false;
-  const host = (req.headers.host ?? '').split(':')[0].toLowerCase();
+  const host = hostHeaderName(req.headers?.host);
   return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || isIpv4Loopback(host);
 }
 function sendJson(res, status, value, headers = {}) {
