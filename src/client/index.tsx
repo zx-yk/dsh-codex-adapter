@@ -95,6 +95,7 @@ const COPY = {
     collapse: '折叠', expand: '展开',
     doneAt: (t: string) => `已更新 · ${t}`,
     installed: '已安装', notInstalled: '未安装', hud: 'HUD 段',
+    hostDetected: '已检测到', hostMissing: '未检测到', notIntegrated: '未接入',
     install: '安装', update: '更新', restore: '还原',
     confirmRestore: (name: string) => `确定从 ${name} 移除 dsh-adapter 集成？（settings 会先备份）`,
     globalConfig: '全局配置',
@@ -199,6 +200,7 @@ const COPY = {
     collapse: 'Collapse', expand: 'Expand',
     doneAt: (t: string) => `Updated · ${t}`,
     installed: 'installed', notInstalled: 'not installed', hud: 'HUD segment',
+    hostDetected: 'detected', hostMissing: 'not detected', notIntegrated: 'not integrated',
     install: 'Install', update: 'Update', restore: 'Restore',
     confirmRestore: (name: string) => `Remove the dsh-adapter integration from ${name}? (settings are backed up first)`,
     globalConfig: 'Global configuration',
@@ -793,19 +795,32 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     </div>
   );
 
-  const integrationRow = (name: string, installed: boolean, extra: any, installTarget: string, uninstallTarget: string, tips: any) => (
+  const integrationRow = (name: string, installed: boolean, detected: boolean, extra: any, installTarget: string, uninstallTarget: string, tips: any) => {
+    // `installed` means our integration files are present; `detected` means
+    // the host software itself is installed. They are independent: a fresh
+    // Codex install has no ds-flash.toml yet and must still read "detected".
+    const dotColor = installed ? '#3fb950' : detected ? '#d29922' : 'rgba(128,128,128,0.45)';
+    const chipStyle = installed
+      ? S.chip(true)
+      : detected
+        ? { ...S.chip(false), color: '#d29922', borderColor: 'rgba(210,153,34,0.5)', opacity: 1 }
+        : S.chip(false);
+    return (
     <div style={{ ...S.card, transition: 'background 120ms ease', borderRadius: 8 }}
       onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.06)'; }}
       onMouseLeave={(e: any) => { e.currentTarget.style.background = 'transparent'; }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 600, fontSize: 13, minWidth: 92 }}>
-        <span aria-hidden="true" title={installed ? copy.installed : copy.notInstalled} style={{
+        <span aria-hidden="true" title={installed ? copy.installed : detected ? copy.hostDetected : copy.hostMissing} style={{
           width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-          background: installed ? '#3fb950' : 'rgba(128,128,128,0.45)',
+          background: dotColor,
           boxShadow: installed ? '0 0 0 2px rgba(63,185,80,0.18)' : 'none',
         }} />
         {name}
       </span>
-      <span style={S.chip(installed)}>{installed ? `● ${copy.installed}` : `○ ${copy.notInstalled}`}</span>
+      <span style={chipStyle} title={installed ? copy.installed : detected ? copy.hostDetected : copy.hostMissing}>
+        {installed ? `● ${copy.installed}` : detected ? `● ${copy.hostDetected}` : `○ ${copy.hostMissing}`}
+      </span>
+      {!installed && detected && <span style={S.chip(false)}>{copy.notIntegrated}</span>}
       {extra}
       <span style={{ flex: 1 }} />
       {!installed && <button style={S.btn} title={tips.install} disabled={busy} onClick={() => { void act(installTarget); }}>{copy.install}</button>}
@@ -819,7 +834,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         }} title={rowNote[installTarget].text}>{rowNote[installTarget].text}</span>
       )}
     </div>
-  );
+    );
+  };
 
   /** Clickable section header that toggles its section's collapsed state. */
 
@@ -999,12 +1015,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
       {tab === 'integrations' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {integrationRow('Claude Code', !!status?.claude?.installed,
+          {integrationRow('Claude Code', !!status?.claude?.installed, !!status?.claude?.detected,
             status?.claude?.installed ? <span style={S.chip(!!status?.claude?.hud)}>{copy.hud}</span> : null,
             'claude', 'claude-uninstall', (copy as any).tips.claude)}
-          {integrationRow('Codex', !!status?.codex?.installed, null, 'codex', 'codex-uninstall', (copy as any).tips.codex)}
-          {integrationRow('Antigravity', !!status?.agy?.installed, null, 'agy', 'agy-uninstall', (copy as any).tips.agy)}
-          {integrationRow('Grok', !!status?.grok?.installed, null, 'grok', 'grok-uninstall', (copy as any).tips.grok)}
+          {integrationRow('Codex', !!status?.codex?.installed, !!status?.codex?.detected, null, 'codex', 'codex-uninstall', (copy as any).tips.codex)}
+          {integrationRow('Antigravity', !!status?.agy?.installed, !!status?.agy?.detected, null, 'agy', 'agy-uninstall', (copy as any).tips.agy)}
+          {integrationRow('Grok', !!status?.grok?.installed, !!status?.grok?.detected, null, 'grok', 'grok-uninstall', (copy as any).tips.grok)}
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, paddingLeft: 2, opacity: config ? 1 : 0.5 }}
             title={copy.globalMcpHint}>
             <input type="checkbox" checked={config?.codex_global_mcp !== false} disabled={busy || !config}

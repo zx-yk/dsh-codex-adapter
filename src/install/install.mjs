@@ -2,8 +2,8 @@
 // render Codex / agy / grok agent roles with real paths. Called from the CLI
 // entry or the DSH settings page. All edits are backed up and idempotent.
 
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync, rmdirSync } from 'node:fs';
-import { dirname, join, resolve, relative } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync, rmdirSync, statSync } from 'node:fs';
+import { dirname, join, resolve, relative, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -160,6 +160,63 @@ export function writeGlobalConfig(patch) {
   return next;
 }
 
+/** True when one of `names` is an executable in PATH (Windows PATHEXT aware). */
+function executableOnPath(names) {
+  const raw = process.env.PATH ?? process.env.Path ?? '';
+  if (!raw) return false;
+  const dirs = raw.split(delimiter)
+    .map((dir) => dir.replace(/^"(.*)"$/, '$1'))
+    .filter(Boolean);
+  const exts = process.platform === 'win32'
+    ? ['', ...(process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean)]
+    : [''];
+  for (const dir of dirs) {
+    for (const name of names) {
+      for (const ext of exts) {
+        try {
+          if (statSync(join(dir, name + ext)).isFile()) return true;
+        } catch { /* try the next candidate */ }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether the host software itself is installed, independent of whether this
+ * plugin has written its integration files. A new machine often has Codex
+ * already installed but no ds-flash.toml yet; the settings page must still
+ * say "detected" instead of "not installed".
+ */
+function detectHosts(home) {
+  const claudeHome = process.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
+  const codexHome = process.env.CODEX_HOME || join(home, '.codex');
+  const exists = (path) => { try { return existsSync(path); } catch { return false; } };
+  const file = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
+  return {
+    claude: executableOnPath(['claude'])
+      || exists(claudeHome)
+      || file(join(claudeHome, 'settings.json'))
+      || exists(join(claudeHome, 'projects'))
+      || file(join(home, '.claude.json')),
+    codex: executableOnPath(['codex'])
+      || exists(codexHome)
+      || file(join(codexHome, 'config.toml'))
+      || file(join(codexHome, 'auth.json'))
+      || exists(join(codexHome, 'sessions')),
+    agy: executableOnPath(['agy'])
+      || exists(join(home, '.gemini'))
+      || exists(join(home, '.gemini', 'antigravity'))
+      || exists(join(home, '.gemini', 'antigravity-cli'))
+      || exists(join(home, '.gemini', 'antigravity-ide'))
+      || file(join(home, '.gemini', 'config', 'mcp_config.json')),
+    grok: executableOnPath(['grok'])
+      || exists(join(home, '.grok'))
+      || file(join(home, '.grok', 'config.toml'))
+      || exists(join(home, '.grok', 'sessions')),
+  };
+}
+
 /** What is currently installed where — drives the settings-page buttons. */
 export function installStatus({ home = homedir() } = {}) {
   const settings = readJson(join(home, '.claude', 'settings.json'), {});
@@ -174,11 +231,12 @@ export function installStatus({ home = homedir() } = {}) {
   const grokTxt = readText(join(home, '.grok', 'config.toml'));
   const grokInstalled = grokTxt.includes('[mcp_servers.dsh-adapter]')
     || existsSync(join(home, '.grok', 'agents', 'ds-flash.md'));
+  const detected = detectHosts(home);
   return {
-    claude: { installed: claudeInstalled, hud: hudWired },
-    codex: { installed: codexInstalled },
-    agy: { installed: agyInstalled },
-    grok: { installed: grokInstalled },
+    claude: { installed: claudeInstalled, hud: hudWired, detected: detected.claude },
+    codex: { installed: codexInstalled, detected: detected.codex },
+    agy: { installed: agyInstalled, detected: detected.agy },
+    grok: { installed: grokInstalled, detected: detected.grok },
   };
 }
 
@@ -503,9 +561,15 @@ export function installAgy({ home = homedir() } = {}) {
   if (bak) actions.push(`backup: ${bak}`);
   const cfg = readJson(mcpFile, {});
   cfg.mcpServers = cfg.mcpServers ?? {};
-  cfg.mcpServers['dsh-adapter'] = { command: 'node', args: [serverPath], disabled: false };
+  const launcher = resolveNodeLauncher();
+  cfg.mcpServers['dsh-adapter'] = {
+    command: launcher.command,
+    args: [serverPath],
+    disabled: false,
+    ...(launcher.env ? { env: launcher.env } : {}),
+  };
   writeFileSync(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
-  actions.push(`mcp: registered dsh-adapter (node ${serverPath}) in ${mcpFile}`);
+  actions.push(`mcp: registered dsh-adapter (${launcher.source} launcher) in ${mcpFile}`);
 
   // 2. Agent definitions (no path rendering needed — agy reads the global MCP
   //    config itself, so the roles never embed a server path).
@@ -598,9 +662,19 @@ export function installGrok({ home = homedir() } = {}) {
   if (bak) actions.push(`backup: ${bak}`);
   let toml = readText(cfgFile);
   toml = removeTomlSection(toml, 'mcp_servers.dsh-adapter').replace(/\n+$/, '');
-  toml += `\n\n[mcp_servers.dsh-adapter]\ncommand = "node"\nargs = [${tomlString(serverPath)}]\nenabled = true\n`;
+  // Resolve the launcher the same way the Codex installer does: a GUI host's
+  // PATH often has no `node`, while DSH ships one (or runs its own Electron
+  // binary in ELECTRON_RUN_AS_NODE mode). Hardcoding `node` made agy/grok
+  // integrations fail to start even though Codex worked.
+  const launcher = resolveNodeLauncher();
+  let block = `[mcp_servers.dsh-adapter]\ncommand = ${tomlString(launcher.command)}\nargs = [${tomlString(serverPath)}]\nenabled = true\n`;
+  if (launcher.env && Object.keys(launcher.env).length > 0) {
+    block += '\n[mcp_servers.dsh-adapter.env]\n'
+      + Object.entries(launcher.env).map(([key, value]) => `${key} = ${tomlString(value)}`).join('\n') + '\n';
+  }
+  toml += `\n\n${block}`;
   writeFileSync(cfgFile, toml);
-  actions.push(`mcp: registered dsh-adapter (node ${serverPath}) in ${cfgFile}`);
+  actions.push(`mcp: registered dsh-adapter (${launcher.source} launcher) in ${cfgFile}`);
 
   // 2. Agent definitions.
   const agentsDir = join(home, '.grok', 'agents');
