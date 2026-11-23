@@ -8,13 +8,18 @@ export function installWorkerQuestionHandoff(agentCtx, job, publish) {
       ...(Array.isArray(q.options) ? { options: q.options.slice(0, 32).map(o => ({ label: String(o.label ?? '').slice(0, 500) })) } : {}),
     })) : [];
     job.status = 'needs_input';
+    job.disposing = true;
     job.questions = questions;
     job.result = JSON.stringify({ needs_input: true, questions, instruction: 'Obtain the required answer or approval from the user, then dispatch a new task with that answer. An unanswered question grants no permission.' });
     job.error = 'Worker stopped for an unresolved question; no option was selected automatically.';
     publish();
     // Dispose the runtime, not merely tell the model to stop: it must not run
-    // another step after an unanswered overwrite/permission question.
-    try { Promise.resolve(job.handle?.dispose()).catch(() => {}); } catch {}
+    // another step after an unanswered overwrite/permission question. While
+    // this is in flight, status must keep the cwd lock: flipping to
+    // needs_input is not proof that the old runtime has stopped writing.
+    const clearDisposing = () => { job.disposing = false; publish(); };
+    try { Promise.resolve(job.handle?.dispose()).catch(() => {}).finally(clearDisposing); }
+    catch { clearDisposing(); }
     const error = new Error(job.error + ' Return the unresolved question to the orchestrator.');
     error.name = 'UserQuestionError'; error.code = 'UNATTENDED_WORKER';
     return Promise.reject(error);

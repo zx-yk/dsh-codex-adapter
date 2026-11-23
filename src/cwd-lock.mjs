@@ -112,6 +112,7 @@ export function settledHubLockIds(remoteJobs, currentLocks) {
     // still starting, letting a second writer into the same workspace.
     if (typeof holder.jobId !== 'string' || holder.jobId === '') continue;
     const job = byId.get(holder.jobId);
+    if (job?.disposing) continue; // runtime still shutting down; not settled yet
     if (job === undefined || job.status !== 'running') out.push(holder.jobId);
   }
   return out;

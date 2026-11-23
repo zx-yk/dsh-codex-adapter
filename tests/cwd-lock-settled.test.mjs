@@ -39,6 +39,18 @@ test('a hub lock whose job id is still being backfilled is never stale', () => {
   assert.deepEqual(settledHubLockIds([], [lock('')]), []);
 });
 
+test('a needs_input job does not release its lock until disposal completes', () => {
+  const holder = lock('hub-1');
+  assert.deepEqual(
+    settledHubLockIds([{ id: 'hub-1', status: 'needs_input', disposing: true }], [holder]),
+    [],
+  );
+  assert.deepEqual(
+    settledHubLockIds([{ id: 'hub-1', status: 'needs_input', disposing: false }], [holder]),
+    ['hub-1'],
+  );
+});
+
 test('an absent list (hub down) is the caller\'s decision, not something this helper guesses', () => {
   // The server must pass null/undefined only when it will not release at all;
   // this helper sees [] as a real, empty answer from the hub.

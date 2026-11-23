@@ -217,11 +217,17 @@ export function basenameOf(cwd: string | null | undefined): string {
 export function abbrevPath(p: any, home?: string | null): string {
   let s = String(p ?? '');
   if (home) {
-    // Match the separator the home path itself uses: a Windows cwd is
-    // "C:\Users\me\repo", not "C:\Users\me/repo".
-    const sep = String(home).includes('\\') && !String(home).includes('/') ? '\\' : '/';
-    if (s === home) return '~';
-    if (s.startsWith(home + sep)) s = '~' + s.slice(home.length);
+    // Compare normalized separators, then rebuild the suffix with the
+    // separator the cwd uses: Windows paths can be "C:\Users\me/repo".
+    const h = String(home).replace(/[\\/]+$/, '');
+    const norm = (x: string) => x.replace(/\\/g, '/').replace(/\/+/g, '/');
+    if (norm(s) === norm(h)) return '~';
+    if (norm(s).startsWith(norm(h) + '/')) {
+      const sep = s.charAt(h.length) === '\\' ? '\\' : '/';
+      const suffix = s.slice(h.length).replace(/^[\\/]+/, '')
+        .replace(sep === '\\' ? /\//g : /\\/g, sep);
+      return '~' + sep + suffix;
+    }
   }
   if (s.length <= 44) return s;
   return s.slice(0, 16) + '…' + s.slice(-26);

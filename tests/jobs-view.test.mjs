@@ -35,3 +35,10 @@ test('abbrevPath collapses a Windows home with the separator the home uses', loa
   assert.equal(abbrevPath('/home/me/repo', '/home/me'), '~/repo');
   assert.equal(abbrevPath('/home/me', '/home/me'), '~');
 });
+
+test('abbrevPath accepts mixed separators between home and cwd', loadOpts, async () => {
+  const { abbrevPath } = await view();
+  assert.equal(abbrevPath('C:/Users/me/repo', 'C:\\Users\\me'), '~/repo');
+  assert.equal(abbrevPath('C:\\Users\\me/repo', 'C:/Users/me'), '~/repo');
+  assert.equal(abbrevPath('C:/Users/me/repo/', 'C:\\Users\\me\\'), '~/repo/');
+});

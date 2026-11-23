@@ -14,16 +14,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const PY_PARSE = 'import sys, json, tomllib; print(json.dumps(tomllib.loads(sys.stdin.read())))';
+// `python3` on Windows is often a .cmd shim that spawnSync cannot start
+// without a shell; `python.exe` is the reliable name there.
+const PY = process.platform === 'win32' ? 'python' : 'python3';
 
 function parseToml(text) {
-  const r = spawnSync('python3', ['-c', PY_PARSE], { input: text, encoding: 'utf8' });
+  const r = spawnSync(PY, ['-c', PY_PARSE], { input: text, encoding: 'utf8' });
   if (r.error || r.status !== 0) {
     return { ok: false, error: (r.stderr || String(r.error)).trim() };
   }
   return { ok: true, value: JSON.parse(r.stdout) };
 }
 
-const hasTomllib = spawnSync('python3', ['-c', 'import tomllib'], { encoding: 'utf8' }).status === 0;
+const hasTomllib = spawnSync(PY, ['-c', 'import tomllib'], { encoding: 'utf8' }).status === 0;
 
 // The installer migrates ~/.config at import time; keep that off the real home.
 let home;
@@ -59,7 +62,9 @@ test('installGrok writes a config.toml that parses', { skip: !hasTomllib && 'pyt
   const parsed = parseToml(readFileSync(join(home, '.grok', 'config.toml'), 'utf8'));
   assert.ok(parsed.ok, parsed.error);
   const server = parsed.value.mcp_servers['dsh-adapter'];
-  assert.equal(server.command, 'node');
+  // installGrok resolves the launcher (system/bundled node or Electron), so
+  // the command is a concrete path on most machines, not the bare string.
+  assert.match(server.command, /(^|[\\/])node(\.exe)?$/i);
   assert.match(server.args[0], /server\.mjs$/);
 });
 

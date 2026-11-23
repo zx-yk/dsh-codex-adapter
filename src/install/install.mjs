@@ -36,7 +36,10 @@ function readText(file) {
  * when the section is absent.
  */
 function tomlTableName(line) {
-  const m = /^\s*\[([^\]]+)\]/.exec(line);
+  // Both [table] and [[array-of-tables]] are section boundaries; the latter
+  // matters when a child such as [[mcp_servers.dsh-adapter.env]] follows the
+  // parent table and must be removed with it.
+  const m = /^\s*\[\[?([^\[\]]+)\]\]?/.exec(line);
   return m ? m[1].trim() : null;
 }
 

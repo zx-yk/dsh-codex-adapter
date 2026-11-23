@@ -4,7 +4,9 @@ This file records review findings that are **not confirmed bugs**. Each item
 lists what would confirm or dismiss it; delete the item once it has been
 checked on a machine with the required environment.
 
-## 1. Windows CLI kill may leave the real CLI process running
+## Open
+
+### 1. Windows CLI kill may leave the real CLI process running
 
 - Files: `src/cli-workers.mjs` (`killGroup`, Windows branch)
 - Status: unconfirmed — needs Windows with `agy` / `grok` installed
@@ -20,55 +22,23 @@ checked on a machine with the required environment.
 - Possible fix if confirmed: terminate the tree with `taskkill /PID <pid> /T
   /F` or a Windows Job Object, instead of only `child.kill`.
 
-## 2. TOML array-of-tables is not recognised by the section walker
+## Resolved by simulation (2026-11-23)
 
-- File: `src/install/install.mjs` (`tomlTableName`, `removeTomlSection`,
-  `codexMcpEnd`)
-- Status: unconfirmed — current Codex/Grok configs use plain tables, not
-  `[[...]]` arrays under the MCP block
-- Why it may matter: `tomlTableName('[[mcp_servers.dsh-adapter.env]]')`
-  captures `[mcp_servers.dsh-adapter.env` (leading `[`), so the walker does not
-  treat it as a sub-table and leaves it behind when the parent section is
-  replaced or removed.
-- How to confirm: write a fixture containing
-  `[[mcp_servers.dsh-adapter.env]]`, run `upsertCodexMcp` /
-  `removeCodexMcp`, and check for an orphan header.
-- Possible fix if confirmed: parse `[[...]]` explicitly in `tomlTableName`
-  and extend the sub-table check to its captured name.
+These were confirmed with fixtures/stubs in the repository, without needing
+the real host software:
 
-## 3. A `needs_input` job releases its cwd lock while disposal is still running
-
-- Files: `src/worker-question.mjs`, `src/cwd-lock.mjs`
-  (`settledHubLockIds`), `src/hub/index.mjs`
-- Status: unconfirmed — disposal is usually quick, but it is started without
-  being awaited
-- Why it may matter: the question handler sets `job.status = 'needs_input'`
-  and calls `Promise.resolve(job.handle?.dispose()).catch(...)` without
-  awaiting it. `settledHubLockIds` treats every non-`running` status as
-  settled and releases the workspace lock. If disposal is still in flight and
-  a tool is writing, a second worker could start in the same cwd.
-- How to confirm: use a fake agent whose `dispose()` resolves after a delay,
-  raise a question, call `dsh_worker_status` immediately, and observe whether
-  the lock is released before disposal completes.
-
-## 4. History loading flag can flip false while another request is pending
-
-- File: `src/client/index.tsx` (`loadHistory`)
-- Status: unconfirmed — UI only
-- Why it may matter: each request sets `historyLoading = true` and the first
-  response's `finally` sets it to false. Two overlapping refreshes can make
-  the button look enabled while the newer request is still running. No data
-  corruption; the last response still wins.
-- How to confirm: trigger two `loadHistory` calls with a delayed first
-  response and observe the button state.
-
-## 5. `abbrevPath` does not shorten mixed-separator Windows paths
-
-- File: `src/client/jobs-view.ts` (`abbrevPath`)
-- Status: unconfirmed — display only
-- Why it may matter: the separator is chosen from `home`; a `home` with `\`
-  and a cwd with `/` (or vice versa) will not match, so the path is shown in
-  full instead of `~/...`.
-- How to confirm: call `abbrevPath('C:/Users/me/repo', 'C:\\Users\\me')`.
-- Possible fix if confirmed: normalise both sides before comparing or accept
-  both separators.
+- **TOML array-of-tables** — `tomlTableName` now recognises `[[...]]`, so a
+  child such as `[[mcp_servers.dsh-adapter.env]]` is removed with its parent.
+  Covered by `tests/codex-mcp-table.test.mjs`.
+- **History loading race** — `loadHistory` is sequence-guarded; a slow earlier
+  response can no longer overwrite a newer one or clear its loading flag.
+- **Mixed-separator `abbrevPath`** — home and cwd are compared with normalized
+  separators and the suffix keeps the cwd's separator. Covered by
+  `tests/jobs-view.test.mjs`.
+- **Skipped TOML tests** — `python3` on Windows is often a `.cmd` shim that
+  `spawnSync` cannot launch; the tests now use `python` there, so the
+  `tomllib` round-trip suite runs instead of being skipped.
+- **`needs_input` disposal race** — while `job.disposing` is true, the hub
+  view marks it and `settledHubLockIds` keeps the cwd lock; the flag clears
+  only after `dispose()` settles. Covered by `tests/worker-question.test.mjs`
+  and `tests/cwd-lock-settled.test.mjs`.

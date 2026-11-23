@@ -151,6 +151,7 @@ export class WorkerRegistry {
       lastEventAt: job.lastEventAt ?? null, timeoutSeconds: job.timeoutSeconds ?? null,
       deadlineAt: job.deadlineAt ?? null, staleSeconds: quietSeconds(job),
       eventSeq: job.eventSeq ?? 0, events: (job.events ?? []).slice(-12),
+      disposing: job.disposing === true,
       ...(job.questions === undefined ? {} : { questions: job.questions }),
     };
     if (withResult) {
@@ -347,7 +348,7 @@ export class WorkerRegistry {
       startedAt, endedAt: null, lastEventAt: startedAt, timeoutSeconds: timeoutSec,
       deadlineAt: new Date(Date.now() + timeoutSec * 1000).toISOString(),
       result: null, error: null, stopReason: null, handle: null, waiters: [],
-      texts: [], events: [], eventSeq: 0,
+      texts: [], events: [], eventSeq: 0, disposing: false,
     };
     this.jobs.set(id, job);
 

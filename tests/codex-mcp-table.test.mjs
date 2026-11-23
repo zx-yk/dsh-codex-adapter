@@ -57,3 +57,14 @@ test('uninstall removes the parent table and its sub-tables, keeping other confi
   assert.match(after, /\[model\]/);
   assert.match(after, /\[other\]/);
 });
+
+test('a child written as an array of tables is removed with its parent', () => {
+  const before = '[model]\nname = "gpt-5"\n\n'
+    + '[mcp_servers.dsh-adapter]\ncommand = "old"\n\n'
+    + '[[mcp_servers.dsh-adapter.env]]\nOLD = "1"\n\n'
+    + '[other]\nkeep = true\n';
+  const after = removeCodexMcp(before);
+  assert.equal(after.includes('mcp_servers.dsh-adapter'), false);
+  assert.match(after, /\[model\]/);
+  assert.match(after, /\[other\]/);
+});

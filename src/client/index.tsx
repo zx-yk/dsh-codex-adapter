@@ -455,6 +455,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const jobCursor = useRef<Record<string, number>>({});
   const [historyAgg, setHistoryAgg] = useState<any>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const historySeq = useRef(0);
   const [provForm, setProvForm] = useState<{
     originalId?: string; name: string; type: 'api' | 'cli'; models: string;
     base_url: string; api_key: string; imagegen_model: string;
@@ -630,10 +631,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     return save;
   }, [post, get, copy]);
   const loadHistory = useCallback(() => {
+    const seq = ++historySeq.current;
     setHistoryLoading(true);
     void get('/history?limit=100').then((r) => {
-      if (r.ok) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
-    }).catch(() => {}).finally(() => setHistoryLoading(false));
+      // A slower earlier request must not overwrite a newer one or clear its
+      // loading flag; only the newest sequence owns the state.
+      if (r.ok && historySeq.current === seq) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
+    }).catch(() => {}).finally(() => {
+      if (historySeq.current === seq) setHistoryLoading(false);
+    });
   }, [get]);
   // History is a separate, collapsed view: fetch it only when that tab is
   // opened instead of loading a 100-row table on every panel mount.

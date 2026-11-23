@@ -7,7 +7,9 @@ test('an unresolved question stops the runtime and remains visible to the caller
   const job = { status: 'running', handle: { dispose() { disposed++; } } };
   installWorkerQuestionHandoff(ctx, job, () => published++);
   await assert.rejects(handler({ questions: [{ id: 'overwrite', question: 'Overwrite existing file?', options: [{ label: 'Yes' }, { label: 'No' }] }] }), /no option was selected automatically/);
-  assert.equal(disposed, 1); assert.equal(published, 1); assert.equal(job.status, 'needs_input');
+  assert.equal(disposed, 1); assert.equal(published, 2); assert.equal(job.status, 'needs_input');
   assert.equal(job.questions[0].question, 'Overwrite existing file?');
   assert.equal(JSON.parse(job.result).needs_input, true);
+  await Promise.resolve();
+  assert.equal(job.disposing, false, 'the lock may be released only after disposal finishes');
 });
