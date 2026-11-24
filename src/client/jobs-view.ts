@@ -15,7 +15,9 @@ export interface GhostEntry { job: any; lastSeenAt: number; misses: number; }
 /** "3m4s ago"-style readable age for a timestamp (ISO string or epoch ms). */
 export function timeAgo(ts: any): string {
   if (ts === undefined || ts === null || ts === '') return '';
-  const s = Math.max(0, Math.round((Date.now() - +new Date(ts)) / 1000));
+  const at = +new Date(ts);
+  if (!Number.isFinite(at)) return '';
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   return `${Math.floor(s / 3600)}h${Math.floor((s % 3600) / 60)}m`;
@@ -54,7 +56,10 @@ export function reconcileGhosts(live: any[], ghosts: Record<string, GhostEntry>,
   const terminal = new Set<string>();
   for (const j of live ?? []) {
     if (!j || !j.id) continue;
-    if (j.status === 'running') next[j.id] = { job: j, lastSeenAt: now, misses: 0 };
+    // needs_input is active: its runtime may still be disposing, and losing
+    // the row on a hub restart is exactly the WPC10 failure this registry
+    // exists to prevent.
+    if (j.status === 'running' || j.status === 'needs_input') next[j.id] = { job: j, lastSeenAt: now, misses: 0 };
     else terminal.add(j.id); // settled in the feed: the ghost (if any) is done
   }
   for (const [id, g] of Object.entries(ghosts ?? {})) {
@@ -76,7 +81,9 @@ export function reconcileGhosts(live: any[], ghosts: Record<string, GhostEntry>,
     next[id] = { job, lastSeenAt, misses };
   }
   const ids = Object.keys(next).sort((a, b) => next[b].lastSeenAt - next[a].lastSeenAt);
-  for (const id of ids.slice(GHOST_CAP)) delete next[id];
+  const liveIds = new Set((live ?? []).filter((j) => j?.id && (j.status === 'running' || j.status === 'needs_input')).map((j) => j.id));
+  const ghostIds = ids.filter((id) => !liveIds.has(id));
+  for (const id of ghostIds.slice(GHOST_CAP)) delete next[id];
   return next;
 }
 
@@ -95,7 +102,7 @@ export function displayJobs(live: any[], ghosts: Record<string, GhostEntry>): an
   }
   return rows
     .map((j) => {
-      if (j?.status === 'running' && j.originWriterAlive === false) {
+      if ((j?.status === 'running' || j?.status === 'needs_input') && j.originWriterAlive === false) {
         return { ...j, status: 'orphaned', orphan: { kind: 'writer-gone', origin: j.origin ?? null } };
       }
       return j;
@@ -157,7 +164,8 @@ export function statusInfoOf(job: any, copy: any): { color: string; label: strin
       return { color: '#d29922', label: copy.statusStalled, title: copy.stalledTip(last) };
     }
     if (job.originShardUpdatedAt) {
-      const mins = Math.floor((Date.now() - +new Date(job.originShardUpdatedAt)) / 60_000);
+      const shardAt = +new Date(job.originShardUpdatedAt);
+      const mins = Number.isFinite(shardAt) ? Math.floor((Date.now() - shardAt) / 60_000) : 0;
       if (mins >= SHARD_STALE_HINT_MIN) {
         return {
           color: mins >= SHARD_STALE_WARN_MIN ? '#d29922' : '#4a9eff',
@@ -305,7 +313,9 @@ export function workspaceLocks(rows: any[]): Array<{ cwd: string; holder: any }>
 /** "7m42s"-style running age since startedAt (epoch ms or ISO), computed against `now`. */
 export function lockAge(startedAt: any, now?: number): string {
   if (startedAt === undefined || startedAt === null || startedAt === '') return '';
-  const s = Math.max(0, Math.round(((now ?? Date.now()) - +new Date(startedAt)) / 1000));
+  const at = +new Date(startedAt);
+  if (!Number.isFinite(at)) return '';
+  const s = Math.max(0, Math.round(((now ?? Date.now()) - at) / 1000));
   return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`;
 }
 

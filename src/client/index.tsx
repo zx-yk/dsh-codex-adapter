@@ -55,11 +55,14 @@ function readGhosts(): Record<string, any> {
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch { return ghostSessionMemory; }
+  } catch { return { ...ghostSessionMemory }; }
 }
 function writeGhosts(ghosts: Record<string, any>): void {
-  try { window.localStorage.setItem(GHOST_STORE_KEY, JSON.stringify(ghosts)); }
-  catch { Object.assign(ghostSessionMemory, ghosts); }
+  try { window.localStorage.setItem(GHOST_STORE_KEY, JSON.stringify(ghosts)); } catch { /* fall through to memory */ }
+  // Keep the fallback in sync even when storage works, so losing storage later
+  // (quota/privacy) cannot resurrect a tombstone the user dismissed.
+  for (const key of Object.keys(ghostSessionMemory)) delete ghostSessionMemory[key];
+  Object.assign(ghostSessionMemory, ghosts);
 }
 
 /** Section open state + toggle, persisted under dsh-adapter.settings.collapse.<section>. */
@@ -403,7 +406,10 @@ function sourceLabel(source?: string) {
 }
 
 function elapsed(startedAt: string, endedAt?: string | null) {
-  const s = Math.max(0, Math.round(((endedAt ? +new Date(endedAt) : Date.now()) - +new Date(startedAt)) / 1000));
+  const start = +new Date(startedAt);
+  const end = endedAt ? +new Date(endedAt) : Date.now();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return '—';
+  const s = Math.max(0, Math.round((end - start) / 1000));
   return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`;
 }
 function ktok(n: number) { return n >= 1000 ? `${Math.round(n / 100) / 10}k` : `${n}`; }
@@ -453,6 +459,9 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [jobEvents, setJobEvents] = useState<Record<string, { items: any[]; status?: string; stale?: number | null }>>({});
   const jobCursor = useRef<Record<string, number>>({});
+  const jobLoading = useRef<Set<string>>(new Set());
+  const terminalFetched = useRef<Record<string, string>>({});
+  const jobsSeq = useRef(0);
   const [historyAgg, setHistoryAgg] = useState<any>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const historySeq = useRef(0);
@@ -572,8 +581,10 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
   const refreshAll = useCallback(async () => {
     try {
+      const seq = ++jobsSeq.current;
       const [j, s, c, pr] = await Promise.all([get('/jobs'), get('/install/status'), get('/config'), get('/presets')]);
-      if (j.ok) mergeJobs(j.jobs ?? []);
+      // A slower mount-time snapshot must not overwrite a newer poll.
+      if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []);
       if (s.ok) setStatus(s.status);
       if (c.ok) {
         setConfig((prev: any) => prev ?? c.config);
@@ -595,7 +606,10 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
   useEffect(() => {
     void refreshAll();
-    const timer = setInterval(() => { void get('/jobs').then((j) => { if (j.ok) mergeJobs(j.jobs ?? []); }).catch(() => {}); }, 3000);
+    const timer = setInterval(() => {
+      const seq = ++jobsSeq.current;
+      void get('/jobs').then((j) => { if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []); }).catch(() => {});
+    }, 3000);
     return () => clearInterval(timer);
   }, [refreshAll, get, mergeJobs]);
 
@@ -646,31 +660,52 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   useEffect(() => { if (tab === 'history') loadHistory(); }, [loadHistory, tab]);
 
   const loadJobEvents = useCallback(async (id: string) => {
+    if (jobLoading.current.has(id)) return false;
+    jobLoading.current.add(id);
     try {
       const r = await get(`/jobs/${encodeURIComponent(id)}/events?after=${jobCursor.current[id] ?? 0}&wait=0`);
-      if (!r.ok) return;
+      if (!r.ok) return false;
       jobCursor.current[id] = r.cursor ?? jobCursor.current[id] ?? 0;
       setJobEvents((m) => ({
         ...m,
         [id]: { items: [...(m[id]?.items ?? []), ...(r.events ?? [])].slice(-200), status: r.status, stale: r.staleSeconds },
       }));
-    } catch { /* hub restarting */ }
+      return true;
+    } catch { /* hub restarting */ return false; }
+    finally { jobLoading.current.delete(id); }
   }, [get]);
 
   const toggleJob = useCallback((id: string) => {
-    setExpandedJob((current) => {
-      if (current === id) return null;
-      jobCursor.current[id] = 0;
-      setJobEvents((m) => ({ ...m, [id]: { items: [] } }));
-      void loadJobEvents(id);
-      return id;
-    });
-  }, [loadJobEvents]);
+    setExpandedJob((current) => (current === id ? null : id));
+  }, []);
+
+  // Opening a row resets its cursor and loads the first slice. This is a
+  // render-time side effect if kept inside the setState updater (StrictMode
+  // replays it, duplicating events), so it lives in an effect.
+  useEffect(() => {
+    if (!expandedJob) return;
+    jobCursor.current[expandedJob] = 0;
+    terminalFetched.current[expandedJob] = '';
+    setJobEvents((m) => ({ ...m, [expandedJob]: { items: [] } }));
+    void loadJobEvents(expandedJob);
+  }, [expandedJob, loadJobEvents]);
 
   useEffect(() => {
     if (!expandedJob) return;
     const job = jobs.find((j: any) => j?.id === expandedJob);
-    if (!job || job.status !== 'running') return;
+    if (job && job.status !== 'running') {
+      const key = job.status ?? 'unknown';
+      if (terminalFetched.current[expandedJob] !== key) {
+        terminalFetched.current[expandedJob] = key;
+        void loadJobEvents(expandedJob).then((ok) => {
+          // If a running poll was still in flight, retry on the next jobs tick
+          // instead of permanently skipping the terminal tail.
+          if (!ok) terminalFetched.current[expandedJob] = '';
+        });
+      }
+      return;
+    }
+    if (!job) return;
     const timer = setInterval(() => { void loadJobEvents(expandedJob); }, 2000);
     return () => clearInterval(timer);
   }, [expandedJob, jobs, loadJobEvents]);

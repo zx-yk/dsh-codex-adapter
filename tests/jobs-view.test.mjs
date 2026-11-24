@@ -42,3 +42,36 @@ test('abbrevPath accepts mixed separators between home and cwd', loadOpts, async
   assert.equal(abbrevPath('C:\\Users\\me/repo', 'C:/Users/me'), '~/repo');
   assert.equal(abbrevPath('C:/Users/me/repo/', 'C:\\Users\\me\\'), '~/repo/');
 });
+
+test('invalid timestamps render empty, never NaN', loadOpts, async () => {
+  const { timeAgo, lockAge } = await view();
+  assert.equal(timeAgo('not-a-date'), '');
+  assert.equal(timeAgo(undefined), '');
+  assert.equal(lockAge('not-a-date'), '');
+  assert.equal(lockAge(undefined), '');
+});
+
+test('needs_input is tracked as active instead of being treated as a terminal ghost', loadOpts, async () => {
+  const { reconcileGhosts, displayJobs } = await view();
+  const now = 1000;
+  let ghosts = reconcileGhosts([{ id: 'a', status: 'running', startedAt: new Date(now).toISOString() }], {}, now);
+  ghosts = reconcileGhosts([{ id: 'a', status: 'needs_input', startedAt: new Date(now).toISOString() }], ghosts, now + 1);
+  assert.equal(ghosts.a.job.status, 'needs_input');
+  ghosts = reconcileGhosts([], ghosts, now + 2);
+  ghosts = reconcileGhosts([], ghosts, now + 3);
+  assert.equal(ghosts.a.job.status, 'orphaned');
+  assert.equal(displayJobs([], ghosts)[0].status, 'orphaned');
+});
+
+test('the ghost cap never evicts live rows', loadOpts, async () => {
+  const { reconcileGhosts } = await view();
+  const now = 1000;
+  let ghosts = reconcileGhosts([], {
+    g1: { job: { id: 'g1', status: 'running' }, lastSeenAt: now, misses: 0 },
+  }, now);
+  const live = Array.from({ length: 45 }, (_, i) => ({ id: 'live-' + i, status: 'running' }));
+  ghosts = reconcileGhosts(live, ghosts, now + 1);
+  assert.equal(Object.keys(ghosts).length, 46);
+  assert.ok(ghosts.g1);
+  assert.ok(ghosts['live-0']);
+});

@@ -247,6 +247,7 @@ function settle(job, { status, error, stopReason }) {
   job._releaseCwdLock = null;
   clearTimeout(job._timer);
   clearTimeout(job._stallTimer);
+  job.harness = null;
   if (job.status === 'cancelled') {
     job.stopReason ??= 'cancelled';
   } else {

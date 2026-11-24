@@ -20,14 +20,17 @@ import { prepareSandboxTemp } from '../sandbox-temp.mjs';
 function eventRecord(event, seq) {
   const at = new Date().toISOString();
   const clip = (v, n) => (typeof v === 'string' && v.length > n ? v.slice(0, n) + '…' : v);
+  const textBlocks = (message) => (Array.isArray(message?.content) ? message.content : [])
+    .filter((c) => c?.type === 'text').map((c) => c.text).join('');
+  const safeJson = (value) => { try { return JSON.stringify(value ?? ''); } catch { return String(value); } };
   const data = event?.data ?? {};
   switch (event?.type) {
     case 'step/start':
       return { seq, at, kind: 'step', turn: data.turn ?? null, step: data.step ?? null };
     case 'tool/call':
-      return { seq, at, kind: 'tool', tool: data.name ?? 'tool', detail: clip(JSON.stringify(data.input ?? data.arguments ?? ''), 300) };
+      return { seq, at, kind: 'tool', tool: data.name ?? 'tool', detail: clip(safeJson(data.input ?? data.arguments ?? ''), 300) };
     case 'tool/result': {
-      const text = (data.message?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join(' ');
+      const text = textBlocks(data.message).replace(/\s+/g, ' ');
       const detail = text || (typeof data.error === 'object' ? data.error?.name ?? '' : data.error) || '';
       return { seq, at, kind: 'tool-result', tool: data.name ?? null, ok: data.ok ?? null, detail: clip(String(detail), 400) };
     }
@@ -36,7 +39,7 @@ function eventRecord(event, seq) {
     case 'approval/decided':
       return { seq, at, kind: 'approval-result', detail: clip(String(data.outcome ?? data.decision ?? ''), 120) };
     case 'assistant/message': {
-      const text = (data.message?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join('');
+      const text = textBlocks(data.message);
       return { seq, at, kind: 'text', text: clip(text, 500) };
     }
     case 'turn/end':
@@ -361,8 +364,6 @@ export class WorkerRegistry {
       result: null, error: null, stopReason: null, handle: null, waiters: [],
       lastText: '', events: [], eventSeq: 0, disposing: false,
     };
-    this.jobs.set(id, job);
-
     const selection = { provider: resolvedProvider, model: resolvedModel, reasoningEffort: dispatchEffort };
     const presets = this.ctx.get('agentPresets');
     const cfg = this.getConfig?.() ?? {};
@@ -370,6 +371,7 @@ export class WorkerRegistry {
     const presetId = presets === undefined
       ? undefined
       : (await presets.resolve(!wanted || wanted === 'default' ? undefined : wanted)).id;
+    this.jobs.set(id, job);
 
     const onEvent = (session, event) => {
       job.lastEventAt = new Date().toISOString();
@@ -455,6 +457,11 @@ export class WorkerRegistry {
       }
       if (job.status === 'failed' && !job.error) job.error = `turn ended: ${job.stopReason ?? 'unknown'}`;
       await this.ctx.sessions.flush(handle.agent.session);
+      // Normal completion must dispose the handle too: DSH keeps the agent
+      // registered and its session/listeners alive until dispose(), which is
+      // what unregisters it. Relying on job-map pruning alone would leave one
+      // live agent per completed task in a long-lived host.
+      try { await handle.dispose(); } catch { /* already disposed */ }
     };
 
     job.promise = run()
@@ -492,8 +499,18 @@ export class WorkerRegistry {
       if (!problem) continue;
       job.status = 'failed';
       job.error = problem.reason;
-      try { job.handle?.dispose?.(); } catch { /* already gone */ }
+      job.endedAt = new Date().toISOString();
+      // Keep the cwd lock until the runtime has actually stopped: a status
+      // flip alone is not proof that the old session stopped writing.
+      job.disposing = true;
       this.publish();
+      const handle = job.handle;
+      let disposal;
+      try { disposal = Promise.resolve(handle?.dispose?.()); }
+      catch { disposal = Promise.resolve(); }
+      disposal
+        .catch(() => {})
+        .finally(() => { job.disposing = false; this.publish(); });
       for (const w of job.waiters.splice(0)) w();
     }
     this.pruneSettled(now);
@@ -559,8 +576,10 @@ export class WorkerRegistry {
     if (job.status === 'running') {
       job.status = 'cancelled';
       job.error = 'cancelled by request';
-      try { await job.handle?.dispose(); } catch {}
+      job.disposing = true;
       this.publish();
+      try { await job.handle?.dispose(); } catch {}
+      finally { job.disposing = false; this.publish(); }
     }
     return job;
   }

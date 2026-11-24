@@ -11,6 +11,12 @@ const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 const SHARD_DIR = join(CONFIG_DIR, 'status.d');
 export const SHARD_FRESH_MS = 30 * 60 * 1000;
 
+/** A shard is fresh only when its timestamp parses and is inside the window. */
+export function shardFresh(updatedAt, now = Date.now()) {
+  const t = Date.parse(updatedAt);
+  return Number.isFinite(t) && now - t <= SHARD_FRESH_MS;
+}
+
 export function createShardWriter(kind) {
   const writer = `${kind}-${process.pid}`;
   const file = join(SHARD_DIR, `${writer}.json`);
@@ -58,7 +64,7 @@ export function readMergedStatus({ excludeWriter } = {}) {
     try {
       const shard = JSON.parse(raw);
       if (shard.writer === excludeWriter) return;
-      if (now - +new Date(shard.updatedAt) > SHARD_FRESH_MS) {
+      if (!shardFresh(shard.updatedAt, now)) {
         // A writer killed hard (SIGKILL, crash) never ran its exit cleanup, so
         // its shard file lingers and every reader re-reads it forever. Once the
         // shard is stale AND its writer is provably gone, drop the file. Unknown

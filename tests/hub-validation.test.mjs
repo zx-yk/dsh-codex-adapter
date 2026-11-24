@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { clipTask, WorkerRegistry } from '../src/hub/index.mjs';
-import { jobView } from '../src/jobs.mjs';
+import { jobView, pruneSettledJobs } from '../src/jobs.mjs';
 import { applyGlobalConfigPatch, GLOBAL_CONFIG_DEFAULTS } from '../src/install/install.mjs';
+import { shardFresh } from '../src/status-shard.mjs';
 
 test('job views tolerate a missing task', () => {
   const view = jobView({ id: 'j1', task: undefined, tier: 'flash', status: 'done' });
@@ -57,4 +58,25 @@ test('settled hub jobs are pruned by age and count, running jobs stay', () => {
   registry.pruneSettled(now);
   const settled = [...registry.jobs.values()].filter((j) => j.status !== 'running').length;
   assert.equal(settled, 500);
+});
+
+test('standalone/CLI job cache is pruned by age and count', () => {
+  const now = Date.now();
+  const old = new Date(now - 7 * 60 * 60 * 1000).toISOString();
+  const recent = new Date(now - 1000).toISOString();
+  const map = new Map([
+    ['old', { status: 'done', endedAt: old }],
+    ['recent', { status: 'done', endedAt: recent }],
+    ['running', { status: 'running', endedAt: null }],
+  ]);
+  pruneSettledJobs(now, map);
+  assert.equal(map.has('old'), false);
+  assert.equal(map.has('recent'), true);
+  assert.equal(map.has('running'), true);
+});
+
+test('a status shard with an unparseable timestamp is never fresh', () => {
+  assert.equal(shardFresh(undefined), false);
+  assert.equal(shardFresh('not-a-date'), false);
+  assert.equal(shardFresh(new Date().toISOString()), true);
 });

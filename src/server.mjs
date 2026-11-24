@@ -436,6 +436,11 @@ server.registerTool('dsh_worker_status', {
   }
   for (const j of remoteJobs) attachOrigin(j, j.id);
   const local = listJobs().map((j) => jobView(j));
+  // /jobs merges the hub shard with every MCP shard, including this same
+  // process's mcp-<pid>.json. Showing those rows twice (remote + local) is
+  // confusing and makes the panel count a job as two workers.
+  const localIds = new Set(local.map((j) => j.id));
+  const remoteOnly = remoteJobs.filter((j) => !localIds.has(j?.id));
   const locks = getCwdLocks().map((l, i) => ({
     kind: 'cwd-lock',
     id: `cwd-lock-${i + 1}`,
@@ -443,7 +448,7 @@ server.registerTool('dsh_worker_status', {
     holder: l.holder,
     note: 'advisory workspace lock: a running worker holds this cwd, so a new dispatch to it is refused (unless allow_concurrent_cwd is set)',
   }));
-  return text([...remoteJobs, ...local, ...locks]);
+  return text([...remoteOnly, ...local, ...locks]);
 });
 
 server.registerTool('dsh_worker_result', {

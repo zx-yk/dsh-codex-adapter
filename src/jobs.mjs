@@ -38,6 +38,8 @@ function loadDotEnv() {
 }
 
 const jobs = new Map();
+const SETTLED_JOB_TTL_MS = 6 * 60 * 60 * 1000;
+const MAX_SETTLED_JOBS = 500;
 let nextId = 1;
 const shard = createShardWriter('mcp');
 
@@ -55,6 +57,7 @@ function clipTask(task, cap = 300) {
 }
 
 export function publishStatus() {
+  pruneSettledJobs();
   shard.publish([...jobs.values()].map((j) => ({
     id: j.id, tier: j.tier, model: j.model, provider: j.provider, effort: j.effort, status: j.status, source: j.source,
     task: clipTask(j.task), cwd: j.cwd, turn: j.turn, step: j.step, toolCalls: j.toolCalls,
@@ -92,9 +95,11 @@ export function jobView(j, { withResult = false } = {}) {
     v.activity = {
       events: j.activity.events,
       lastEventAt: j.activity.lastEventAt,
-      staleSeconds: j.activity.lastEventAt
-        ? Math.round((Date.now() - Date.parse(j.activity.lastEventAt)) / 1000)
-        : null,
+      staleSeconds: (() => {
+        if (!j.activity.lastEventAt) return null;
+        const at = Date.parse(j.activity.lastEventAt);
+        return Number.isFinite(at) ? Math.max(0, Math.round((Date.now() - at) / 1000)) : null;
+      })(),
     };
     v.liveness = j.liveness ?? null;
   }
@@ -104,6 +109,27 @@ export function jobView(j, { withResult = false } = {}) {
 
 export function listJobs() { return [...jobs.values()]; }
 export function getJob(id) { return jobs.get(id); }
+
+/** Drop settled jobs after a retention window and cap the terminal backlog. */
+export function pruneSettledJobs(now = Date.now(), map = jobs) {
+  const terminal = [];
+  for (const [id, job] of map) {
+    if (job.status === 'running' || !job.endedAt) continue;
+    const ended = Date.parse(job.endedAt);
+    if (Number.isFinite(ended)) terminal.push({ id, ended });
+  }
+  terminal.sort((a, b) => a.ended - b.ended);
+  for (const { id, ended } of terminal) {
+    if (now - ended > SETTLED_JOB_TTL_MS) map.delete(id);
+  }
+  const settled = [...map.entries()]
+    .filter(([, job]) => job.status !== 'running' && job.endedAt)
+    .sort((a, b) => Date.parse(a[1].endedAt) - Date.parse(b[1].endedAt));
+  while (settled.length > MAX_SETTLED_JOBS) {
+    const [id] = settled.shift();
+    map.delete(id);
+  }
+}
 
 /** Register a job created elsewhere (cli-workers.mjs) in the shared registry. */
 export function registerJob(job) {
@@ -144,6 +170,9 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
     result: null, error: null, stopReason: null, harness: null,
     waiters: [], _releaseCwdLock: releaseLock,
   };
+
+  let deadlineTimer = null;
+  const clearDeadline = () => { if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; } };
 
   try {
     // The DSH SDK is only needed by the standalone dispatch path, so it is
@@ -234,9 +263,35 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
       publishStatus();
     };
 
+    if (Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0) {
+      deadlineTimer = setTimeout(() => {
+        if (job.status !== 'running') return;
+        job.status = 'failed';
+        job.stopReason = 'timeout';
+        job.error = `timed out after ${Math.round(Number(timeoutMs) / 1000)}s`;
+        job.endedAt = new Date().toISOString();
+        job.disposing = true;
+        publishStatus();
+        let closing;
+        try { closing = Promise.resolve(harness.close()); }
+        catch { closing = Promise.resolve(); }
+        closing
+          .catch(() => {})
+          .finally(() => {
+            job.disposing = false;
+            job._releaseCwdLock?.();
+            job._releaseCwdLock = null;
+            publishStatus();
+            for (const w of job.waiters.splice(0)) w();
+          });
+      }, Number(timeoutMs));
+      deadlineTimer.unref?.();
+    }
+
     job.promise = harness
       .run(task, { sessionId, onNotification })
       .then((result) => {
+        if (job.status !== 'running') return;
         job.result = result.finalResponse ?? '';
         const lastEnd = [...(result.events ?? [])].reverse().find((ev) => ev?.type === 'turn/end');
         job.stopReason = lastEnd?.data?.reason?.kind ?? job.stopReason;
@@ -244,13 +299,16 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
         if (job.status === 'failed' && !job.error) job.error = `turn ended with reason: ${job.stopReason ?? 'unknown'}`;
       })
       .catch((err) => {
-        job.status = job.status === 'cancelled' ? 'cancelled' : 'failed';
+        if (job.status !== 'running') return;
+        job.status = 'failed';
         job.error = err?.message ?? String(err);
       })
       .finally(async () => {
+        clearDeadline();
         job.endedAt = new Date().toISOString();
         job.currentTool = null;
         try { await harness.close(); } catch {}
+        job.harness = null;
         // Release the cwd lock on EVERY terminal path: done, failed,
         // cancelled, request-timeout (harness rejects) all land here.
         job._releaseCwdLock?.();
@@ -260,10 +318,15 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
       });
   } catch (err) {
     // Failed start (SDK missing, no API key, spawn error, ...): settle the
-    // record and free the lock so the cwd never stays locked.
+    // record and free the lock so the cwd never stays locked. If the harness
+    // was constructed but run() threw before returning a promise, close it
+    // here too; otherwise its child process would outlive the failed dispatch.
     job.status = 'failed';
     job.error = err?.message ?? String(err);
     job.endedAt = new Date().toISOString();
+    try { await job.harness?.close?.(); } catch {}
+    clearDeadline();
+    job.harness = null;
     job._releaseCwdLock?.();
     job._releaseCwdLock = null;
     publishStatus();
