@@ -69,16 +69,28 @@ function run(cmd, args, { timeoutMs, cwd } = {}) {
   // differently when handed an open interactive stdin pipe.
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '', err = '';
-    const timer = setTimeout(() => { child.kill('SIGKILL'); }, timeoutMs ?? 180_000);
-    child.stdout.on('data', (c) => { out += c; });
-    child.stderr.on('data', (c) => { err += c; });
-    child.on('error', (e) => { clearTimeout(timer); reject(new Error(`${cmd} spawn failed: ${e.message}`)); });
-    child.on('close', (code, signal) => {
+    let out = '', err = '', settled = false, timer;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      if (signal) reject(new Error(`${cmd} killed by ${signal} (timeout ${timeoutMs ?? 180_000}ms)\n${err.slice(-400)}`));
-      else if (code !== 0) reject(new Error(`${cmd} exited ${code}\n${(err || out).slice(-400)}`));
-      else resolve(out + (out === '' ? err : ''));
+      if (error) reject(error); else resolve(value);
+    };
+    timer = setTimeout(() => {
+      // A grandchild can inherit stdout/stderr and keep `close` from firing;
+      // settle the tool call on the deadline anyway, then kill the direct
+      // child. The caller must not hang past its documented timeout.
+      try { child.kill('SIGKILL'); } catch {}
+      finish(new Error(`${cmd} timed out after ${timeoutMs ?? 180_000}ms\n${err.slice(-400)}`));
+    }, timeoutMs ?? 180_000);
+    child.stdout.on('data', (c) => { out = (out + c).slice(-1_000_000); });
+    child.stderr.on('data', (c) => { err = (err + c).slice(-1_000_000); });
+    child.on('error', (e) => finish(new Error(`${cmd} spawn failed: ${e.message}`)));
+    child.on('close', (code, signal) => {
+      if (settled) return;
+      if (signal) finish(new Error(`${cmd} killed by ${signal} (timeout ${timeoutMs ?? 180_000}ms)\n${err.slice(-400)}`));
+      else if (code !== 0) finish(new Error(`${cmd} exited ${code}\n${(err || out).slice(-400)}`));
+      else finish(null, out + (out === '' ? err : ''));
     });
   });
 }
@@ -157,7 +169,14 @@ async function describeViaAgy(imagePath, question, model) {
 }
 
 /** Shell-quote a value for interpolation into a custom command template. */
-function shq(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
+const IS_WIN = process.platform === 'win32';
+function shq(s) {
+  if (IS_WIN) return '"' + String(s).replace(/"/g, '\\"') + '"';
+  return "'" + String(s).replace(/'/g, "'\\''") + "'";
+}
+function shellCommand(cmd) {
+  return IS_WIN ? ['cmd.exe', ['/d', '/s', '/c', cmd]] : ['/bin/bash', ['-lc', cmd]];
+}
 
 /**
  * API key for a custom provider. A blank `api_key` is not a key: fall through
@@ -303,7 +322,7 @@ async function describeViaCustom(entry, imagePath, question, model) {
     .replaceAll('{image}', shq(imagePath))
     .replaceAll('{question}', shq(question))
     .replaceAll('{model}', shq(model ?? 'default'));
-  return (await run('/bin/bash', ['-lc', cmd], { timeoutMs: 240_000, cwd: dirname(imagePath) })).trim();
+  return (await run(...shellCommand(cmd), { timeoutMs: 240_000, cwd: dirname(imagePath) })).trim();
 }
 
 async function generateViaCustom(entry, prompt, outputPath, size) {
@@ -317,7 +336,7 @@ async function generateViaCustom(entry, prompt, outputPath, size) {
     .replaceAll('{prompt}', shq(prompt))
     .replaceAll('{output}', shq(outputPath))
     .replaceAll('{size}', shq(size ?? ''));
-  const out = await run('/bin/bash', ['-lc', cmd], { timeoutMs: 480_000, cwd: dirname(outputPath) });
+  const out = await run(...shellCommand(cmd), { timeoutMs: 480_000, cwd: dirname(outputPath) });
   if (!existsSync(outputPath)) {
     throw new Error(`custom command finished but ${outputPath} was not created. Tail:\n${out.trim().slice(-300)}`);
   }
@@ -503,7 +522,7 @@ export async function testProvider(entry, lang) {
   const bin = (cmd) => String(cmd).trim().split(/\s+/)[0];
   if (entry.vision_command) {
     try {
-      const which = (await run('/bin/bash', ['-lc', `command -v ${shq(bin(entry.vision_command))}`], { timeoutMs: 15_000 })).trim();
+      const which = (await run(...shellCommand(`${IS_WIN ? 'where' : 'command -v'} ${shq(bin(entry.vision_command))}`), { timeoutMs: 15_000 })).trim();
       push(tr('视觉命令可执行', 'Vision command found'), true, which);
     } catch {
       push(tr('视觉命令可执行', 'Vision command found'), false, tr(`找不到可执行文件: ${bin(entry.vision_command)}`, `executable not found: ${bin(entry.vision_command)}`));
@@ -522,7 +541,7 @@ export async function testProvider(entry, lang) {
   }
   if (entry.imagegen_command) {
     try {
-      const which = (await run('/bin/bash', ['-lc', `command -v ${shq(bin(entry.imagegen_command))}`], { timeoutMs: 15_000 })).trim();
+      const which = (await run(...shellCommand(`${IS_WIN ? 'where' : 'command -v'} ${shq(bin(entry.imagegen_command))}`), { timeoutMs: 15_000 })).trim();
       push(tr('生图命令可执行', 'Image-gen command found'), true, tr(`${which}（未实际出图，避免长时间等待）`, `${which} (not actually run — that would take minutes)`));
     } catch {
       push(tr('生图命令可执行', 'Image-gen command found'), false, tr(`找不到可执行文件: ${bin(entry.imagegen_command)}`, `executable not found: ${bin(entry.imagegen_command)}`));

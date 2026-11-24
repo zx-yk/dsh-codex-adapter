@@ -32,7 +32,12 @@ export async function hubAvailable() {
 
 async function call(path, init) {
   const res = await fetch(`${apiBase()}${path}`, init);
-  const body = await res.json();
+  const text = await res.text();
+  let body;
+  try { body = text === '' ? {} : JSON.parse(text); }
+  catch {
+    throw new Error(`hub ${init?.method ?? 'GET'} ${path} → ${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+  }
   if (!res.ok || body.ok === false) throw new Error(body.error ?? `hub request failed (${res.status})`);
   return body;
 }

@@ -155,7 +155,16 @@ async function acquireDispatchLock({ cwd, backend, mode, allowConcurrent }) {
       if (typeof err.holder.jobId !== 'string' || err.holder.jobId === '') throw err;
       let settled = false;
       try {
-        const view = await hub.get(err.holder.jobId, 0);
+        let view = await hub.get(err.holder.jobId, 0);
+        // A watchdog/cancel marks the job failed and keeps `disposing` true
+        // until its runtime stops. Wait briefly for that terminal edge instead
+        // of misreporting the just-failed job as a live lock holder.
+        if (view?.disposing === true) {
+          for (let waited = 0; waited < 5000 && view?.disposing === true; waited += 200) {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            view = await hub.get(err.holder.jobId, 0);
+          }
+        }
         settled = hubViewTerminal(view);
       } catch (e) {
         if (String(e?.message ?? e).includes('no such job')) settled = true;
@@ -236,7 +245,7 @@ server.registerTool('dsh_run_worker', {
           preset: presetForTier(t), timeoutSeconds: timeout,
           binding: bindingForTier(t), origin: origin.origin,
         }));
-        updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
+        if (lock.holder) updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
         rememberHubOrigin(spawned.id, origin.origin);
       } catch (err) {
         lock.release();
@@ -245,7 +254,14 @@ server.registerTool('dsh_run_worker', {
       // The hub client slices this wait internally; a single request that
       // waits minutes would be cut by undici's 300 s header timeout and
       // reported as a bare "fetch failed" while the job kept running.
-      const got = await hub.get(spawned.id, timeout);
+      let got;
+      try { got = await hub.get(spawned.id, timeout); }
+      catch (err) {
+        // The worker did start; losing its id to a transient poll failure
+        // would orphan a running job. Return the spawn claim plus the error.
+        const message = String(err?.message ?? err);
+        return { view: { ...spawned, note: `spawned, but the status poll failed: ${message}; poll with dsh_worker_result`, poll_error: message } };
+      }
       attachOrigin(got, spawned.id);
       if (hubViewTerminal(got)) releaseCwdLockByJobId(spawned.id);
       return { view: got };
@@ -410,7 +426,7 @@ server.registerTool('dsh_spawn_worker', {
         preset: presetForTier(t), timeoutSeconds: timeout,
         binding: bindingForTier(t), origin: origin.origin,
       }));
-      updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
+      if (lock.holder) updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
       rememberHubOrigin(spawned.id, origin.origin);
     } catch (err) {
       lock.release();

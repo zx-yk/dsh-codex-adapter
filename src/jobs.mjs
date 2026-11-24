@@ -40,7 +40,7 @@ function loadDotEnv() {
 
 const jobs = new Map();
 const recorded = readHistoryIds();
-const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled']);
+const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled', 'needs_input']);
 const SETTLED_JOB_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_SETTLED_JOBS = 500;
 let nextId = 1;
@@ -161,7 +161,7 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
   if (!['off', 'high', 'max'].includes(effort)) throw new Error(`unknown effort "${effort}" (expected: off, high, max)`);
 
   const workspace = resolve(cwd ?? process.cwd());
-  const id = `job-${nextId++}-${Date.now().toString(36)}`;
+  const id = `job-${nextId++}-${process.pid.toString(36)}-${Date.now().toString(36)}`;
   const startedAt = new Date().toISOString();
 
   // Cwd advisory lock FIRST: a conflicting dispatch is refused before any
@@ -173,7 +173,7 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
   }
 
   const job = {
-    id, tier, model: dispatchModel, provider: dispatchProvider, effort, task, source, cwd: workspace,
+    id, tier, model: dispatchModel, provider: dispatchProvider, effort, task, source, cwd: workspace, mode: 'standalone',
     status: 'running', turn: 0, step: 0, currentTool: null, toolCalls: 0,
     tokens: { input: 0, output: 0, reasoning: 0 },
     startedAt, endedAt: null,

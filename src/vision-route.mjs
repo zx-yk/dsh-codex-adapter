@@ -90,7 +90,7 @@ export function installVisionRoute(ctx, getConfig) {
     // would duplicate the picture's content in every step.
     try {
       const selection = payload.modelSelection;
-      if (selection?.provider && selection?.model) {
+      if (selection?.provider && selection?.model && selection.provider !== VISION_PROVIDER) {
         const info = await ctx.llm.resolveModelInfo(selection.provider, selection.model);
         if ((info?.inputModalities ?? []).includes('image')) return decision;
       }

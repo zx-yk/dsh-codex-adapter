@@ -30,6 +30,8 @@ export function historyRecord(job) {
     source: job.source ?? null,
     cwd: job.cwd ?? null,
     mode: job.mode ?? null,
+    backend: job.backend ?? null,
+    profile: job.profile ?? null,
     task: clip(job.task, 400),
     result: clip(job.result, 1500),
     error: clip(job.error, 400),
@@ -38,6 +40,7 @@ export function historyRecord(job) {
     tokens: job.tokens ?? null,
     toolCalls: job.toolCalls ?? null,
     turn: job.turn ?? null,
+    ...(job.questions === undefined ? {} : { questions: job.questions }),
   };
 }
 

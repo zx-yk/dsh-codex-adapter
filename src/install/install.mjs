@@ -2,7 +2,7 @@
 // render Codex / agy / grok agent roles with real paths. Called from the CLI
 // entry or the DSH settings page. All edits are backed up and idempotent.
 
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync, rmdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync, rmdirSync, statSync, renameSync } from 'node:fs';
 import { dirname, join, resolve, relative, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -22,12 +22,27 @@ function backup(file) {
   return null;
 }
 
-function readJson(file, fallback) {
-  try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return fallback; }
+function readJson(file, fallback, strict = false) {
+  try { return JSON.parse(readFileSync(file, 'utf8')); }
+  catch (error) {
+    // A missing file is a fresh install. A file we cannot parse is NOT empty:
+    // silently returning {} and then writing would erase the user's settings.
+    if (error?.code === 'ENOENT') return fallback;
+    if (strict) throw new Error(`cannot parse ${file}: ${error?.message ?? error}`);
+    return fallback;
+  }
 }
 
 function readText(file) {
   try { return readFileSync(file, 'utf8'); } catch { return ''; }
+}
+
+/** Honour the relocation env vars the host applications themselves use. */
+function claudeDir(home = homedir()) {
+  return process.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
+}
+function codexDir(home = homedir()) {
+  return process.env.CODEX_HOME || join(home, '.codex');
 }
 
 /**
@@ -45,7 +60,7 @@ function tomlTableName(line) {
 
 function removeTomlSection(toml, header) {
   const lines = toml.split('\n');
-  const start = lines.findIndex((l) => l.trim() === '[' + header + ']');
+  const start = lines.findIndex((l) => tomlTableName(l) === header);
   if (start === -1) return toml;
   // A table owns its sub-tables: [x] followed by [x.env] is one block. Stop
   // only at a table that is neither, otherwise removing [x] would leave an
@@ -185,7 +200,9 @@ export function applyGlobalConfigPatch(current, patch) {
 export function writeGlobalConfig(patch) {
   mkdirSync(CONFIG_DIR_HOME(), { recursive: true });
   const next = applyGlobalConfigPatch(readGlobalConfig(), patch);
-  writeFileSync(GLOBAL_CONFIG_FILE, JSON.stringify(next, null, 2) + '\n');
+  const temp = `${GLOBAL_CONFIG_FILE}.tmp-${process.pid}`;
+  writeFileSync(temp, JSON.stringify(next, null, 2) + '\n');
+  renameSync(temp, GLOBAL_CONFIG_FILE);
   return next;
 }
 
@@ -218,8 +235,8 @@ function executableOnPath(names) {
  * say "detected" instead of "not installed".
  */
 function detectHosts(home) {
-  const claudeHome = process.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
-  const codexHome = process.env.CODEX_HOME || join(home, '.codex');
+  const claudeHome = claudeDir(home);
+  const codexHome = codexDir(home);
   const exists = (path) => { try { return existsSync(path); } catch { return false; } };
   const file = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
   return {
@@ -248,12 +265,12 @@ function detectHosts(home) {
 
 /** What is currently installed where — drives the settings-page buttons. */
 export function installStatus({ home = homedir() } = {}) {
-  const settings = readJson(join(home, '.claude', 'settings.json'), {});
+  const settings = readJson(join(claudeDir(home), 'settings.json'), {});
   const enabled = settings.enabledPlugins;
   const claudeInstalled = !!(enabled && !Array.isArray(enabled) && enabled[PLUGIN_KEY]);
   const hudWired = typeof settings.statusLine?.command === 'string'
     && settings.statusLine.command.includes('worker-segment.sh');
-  const codexInstalled = existsSync(join(home, '.codex', 'agents', 'ds-flash.toml'));
+  const codexInstalled = existsSync(join(codexDir(home), 'agents', 'ds-flash.toml'));
   const agyMcp = readJson(join(home, '.gemini', 'config', 'mcp_config.json'), {});
   const agyInstalled = !!(agyMcp.mcpServers && agyMcp.mcpServers['dsh-adapter'])
     || existsSync(join(home, '.gemini', 'config', 'agents', 'ds-flash.md'));
@@ -272,14 +289,14 @@ export function installStatus({ home = homedir() } = {}) {
 export function uninstallCodex({ home = homedir() } = {}) {
   const actions = [];
   for (const f of ['ds-flash.toml', 'ds-pro.toml']) {
-    const p = join(home, '.codex', 'agents', f);
+    const p = join(codexDir(home), 'agents', f);
     if (existsSync(p)) { backup(p); rmSync(p); actions.push(`removed: ${p} (backup kept)`); }
   }
   for (const f of ['dsh-config.md', 'dsh-status.md', 'dsh-playbook.md']) {
-    const p = join(home, '.codex', 'prompts', f);
+    const p = join(codexDir(home), 'prompts', f);
     if (existsSync(p)) { rmSync(p); actions.push(`removed: ${p}`); }
   }
-  const configFile = join(process.env.CODEX_HOME || join(home, '.codex'), 'config.toml');
+  const configFile = join(codexDir(home), 'config.toml');
   if (existsSync(configFile)) {
     const before = readFileSync(configFile, 'utf8');
     if (before.includes('[mcp_servers.dsh-adapter]')) {
@@ -301,11 +318,11 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
   actions.push(`marketplace: ${mpDir} (self-marketplace, source ./)`);
 
   // 2. settings.json: marketplace + enabledPlugins + permissions allowlist.
-  const settingsFile = join(home, '.claude', 'settings.json');
+  const settingsFile = join(claudeDir(home), 'settings.json');
   mkdirSync(dirname(settingsFile), { recursive: true });
   const bak = backup(settingsFile);
   if (bak) actions.push(`backup: ${bak}`);
-  const settings = readJson(settingsFile, {});
+  const settings = readJson(settingsFile, {}, true);
 
   // Both fields are records (see json.schemastore.org/claude-code-settings.json).
   // Older versions of this installer wrote arrays, which Claude Code ignores
@@ -492,7 +509,7 @@ function codexMcpEnd(lines, start) {
 export function upsertCodexMcp(text, serverPath, launcher = { command: 'node', source: 'fallback' }) {
   const block = codexMcpBlock(serverPath, launcher);
   const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
+  const start = lines.findIndex((line) => tomlTableName(line) === 'mcp_servers.dsh-adapter');
   if (start === -1) return (text.trimEnd() ? text.trimEnd() + '\n\n' : '') + block;
   // Replace the whole table INCLUDING [mcp_servers.dsh-adapter.env]. Otherwise
   // a launcher change leaves the old env behind, and an Electron launcher
@@ -506,7 +523,7 @@ export function upsertCodexMcp(text, serverPath, launcher = { command: 'node', s
 
 export function removeCodexMcp(text) {
   const lines = text.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === '[mcp_servers.dsh-adapter]');
+  const start = lines.findIndex((line) => tomlTableName(line) === 'mcp_servers.dsh-adapter');
   if (start === -1) return text;
   const end = codexMcpEnd(lines, start);
   return [...lines.slice(0, start), ...lines.slice(end)].join('\n');
@@ -514,7 +531,7 @@ export function removeCodexMcp(text) {
 
 export function installCodex({ home = homedir(), scope, globalMcp = true } = {}) {
   const actions = [];
-  const agentsDir = scope === 'project' ? join(process.cwd(), '.codex', 'agents') : join(home, '.codex', 'agents');
+  const agentsDir = scope === 'project' ? join(process.cwd(), '.codex', 'agents') : join(codexDir(home), 'agents');
   mkdirSync(agentsDir, { recursive: true });
   const srcDir = join(ROOT, 'codex', 'agents');
   for (const f of readdirSync(srcDir).filter((f) => f.endsWith('.toml'))) {
@@ -526,7 +543,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
     writeFileSync(dest, rendered);
     actions.push(`role: ${dest}`);
   }
-  const promptsDir = scope === 'project' ? join(process.cwd(), '.codex', 'prompts') : join(home, '.codex', 'prompts');
+  const promptsDir = scope === 'project' ? join(process.cwd(), '.codex', 'prompts') : join(codexDir(home), 'prompts');
   mkdirSync(promptsDir, { recursive: true });
   const promptsSrc = join(ROOT, 'codex', 'prompts');
   for (const f of readdirSync(promptsSrc).filter((f) => f.endsWith('.md'))) {
@@ -536,7 +553,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
   // The desktop client has no subagent spawn UI; a global MCP entry lets any
   // session call dsh_run_worker directly. Agent roles above stay for the CLI.
   try {
-    const configFile = join(process.env.CODEX_HOME || join(home, '.codex'), 'config.toml');
+    const configFile = join(codexDir(home), 'config.toml');
     mkdirSync(dirname(configFile), { recursive: true });
     const before = existsSync(configFile) ? readFileSync(configFile, 'utf8') : '';
     if (!globalMcp) {
@@ -588,7 +605,7 @@ export function installAgy({ home = homedir() } = {}) {
   mkdirSync(dirname(mcpFile), { recursive: true });
   const bak = backup(mcpFile);
   if (bak) actions.push(`backup: ${bak}`);
-  const cfg = readJson(mcpFile, {});
+  const cfg = readJson(mcpFile, {}, true);
   cfg.mcpServers = cfg.mcpServers ?? {};
   const launcher = resolveNodeLauncher();
   cfg.mcpServers['dsh-adapter'] = {
@@ -628,7 +645,7 @@ export function uninstallAgy({ home = homedir() } = {}) {
   const actions = [];
 
   const mcpFile = join(home, '.gemini', 'config', 'mcp_config.json');
-  const cfg = readJson(mcpFile, null);
+  const cfg = readJson(mcpFile, null, true);
   if (cfg && cfg.mcpServers && cfg.mcpServers['dsh-adapter']) {
     backup(mcpFile);
     delete cfg.mcpServers['dsh-adapter'];
@@ -772,8 +789,8 @@ export function uninstallGrok({ home = homedir() } = {}) {
  * --extra-cmd hook (requires CLAUDE_HUD_ALLOW_EXTRA_CMD=1). Idempotent.
  */
 export function installHudSegment({ home = homedir() } = {}) {
-  const settingsFile = join(home, '.claude', 'settings.json');
-  const settings = readJson(settingsFile, null);
+  const settingsFile = join(claudeDir(home), 'settings.json');
+  const settings = readJson(settingsFile, null, true);
   if (!settings) return { ok: false, actions: ['settings.json not found'] };
   const cmd = settings.statusLine?.command;
   if (typeof cmd !== 'string' || !cmd.includes('claude-hud')) {
@@ -823,8 +840,8 @@ function isDshMarketplaceEntry(entry) {
 
 export async function uninstallClaudeCode({ home = homedir() } = {}) {
   const actions = [];
-  const settingsFile = join(home, '.claude', 'settings.json');
-  const settings = readJson(settingsFile, null);
+  const settingsFile = join(claudeDir(home), 'settings.json');
+  const settings = readJson(settingsFile, null, true);
   if (!settings) return { ok: true, actions: ['settings.json not found'] };
   backup(settingsFile);
   if (Array.isArray(settings.extraKnownMarketplaces)) {

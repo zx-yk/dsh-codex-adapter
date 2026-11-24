@@ -49,7 +49,7 @@ function eventRecord(event, seq) {
   }
 }
 
-const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled']);
+const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled', 'needs_input']);
 import { probeProvider } from '../provider-probe.mjs';
 
 // No @deepseek-ai imports here on purpose: this plugin is loaded into the
@@ -328,6 +328,13 @@ export class WorkerRegistry {
       throw new Error('task must be a non-empty string');
     }
     if (!TIERS.includes(tier)) throw new Error(`unknown tier "${tier}"`);
+    if (!['off', 'high', 'max'].includes(effort)) throw new Error(`unknown effort "${effort}"`);
+    // Accept POSIX, Windows drive (D:\x, C:/x) and UNC (\\srv\share) roots.
+    if (!isAbsoluteCwd(cwd)) throw new Error('cwd must be an absolute path');
+    if (timeout_seconds !== undefined) {
+      const n = Number(timeout_seconds);
+      if (!Number.isFinite(n) || n <= 0) throw new Error('timeout_seconds must be a positive number');
+    }
     // An explicit {provider, model} from the caller wins (the MCP process owns
     // session-level overrides, exactly as it does for presets); otherwise the
     // hub's own stored config decides, and failing that the tier default.
@@ -350,22 +357,19 @@ export class WorkerRegistry {
     }
     const resolvedProvider = typeof provider === 'string' && provider.trim() !== '' ? provider.trim() : bound.provider;
     const resolvedModel = typeof model === 'string' && model.trim() !== '' ? model.trim() : bound.model;
-    if (!['off', 'high', 'max'].includes(effort)) throw new Error(`unknown effort "${effort}"`);
-    // Accept POSIX, Windows drive (D:\x, C:/x) and UNC (\\srv\share) roots.
-    if (!isAbsoluteCwd(cwd)) throw new Error('cwd must be an absolute path');
     // One canonical form for the job, the advisory lock and the workspace
     // lookup: D:/x and D:\x must map to the same workspace on Windows.
     const cwdPath = canonicalCwd(cwd);
     await this.ctx.get('loader')?.await();
 
-    const id = `hub-${this.nextId++}-${Date.now().toString(36)}`;
+    const id = `hub-${this.nextId++}-${process.pid.toString(36)}-${Date.now().toString(36)}`;
     const sessionId = `session-${randomUUID()}`;
     const timeoutSec = Number(timeout_seconds) > 0
       ? Number(timeout_seconds)
       : (Number(this.getConfig?.().default_timeout_seconds) || 1800);
     const startedAt = new Date().toISOString();
     const job = {
-      id, sessionId, tier, model: resolvedModel, provider: resolvedProvider, effort: dispatchEffort, task, source, cwd: cwdPath,
+      id, sessionId, tier, model: resolvedModel, provider: resolvedProvider, effort: dispatchEffort, task, source, cwd: cwdPath, mode: 'hub',
       status: 'running', turn: 0, step: 0, currentTool: null, toolCalls: 0,
       tokens: { input: 0, output: 0, reasoning: 0 },
       startedAt, endedAt: null, lastEventAt: startedAt, timeoutSeconds: timeoutSec,
@@ -439,6 +443,11 @@ export class WorkerRegistry {
         },
       });
       job.handle = handle;
+      if (job.status !== 'running') {
+        try { await handle.dispose(); } catch {}
+        job.disposing = false;
+        return;
+      }
       // Nobody attends a worker session, so an interactive approval would sit
       // until the job timeout (or forever before the watchdog existed).
       // 'never' makes the tool call fail closed immediately with a clear
@@ -461,6 +470,7 @@ export class WorkerRegistry {
         this.ctx.logger?.warn?.(`dsh-adapter: workspace attach failed for ${cwdPath}: ${err?.message ?? err}`);
       }
       await handle.agent.whenIdle();
+      if (job.status !== 'running') return;
       handle.agent.followup(userMessage(task));
       await handle.agent.whenIdle();
       if (job.status === 'running') {
@@ -485,6 +495,7 @@ export class WorkerRegistry {
         job.endedAt = new Date().toISOString();
         job.currentTool = null;
         job.handle = null;
+        if (job.status === 'cancelled') job.disposing = false;
         this.publish();
         for (const w of job.waiters.splice(0)) w();
       });
@@ -587,11 +598,20 @@ export class WorkerRegistry {
     if (!job) return undefined;
     if (job.status === 'running') {
       job.status = 'cancelled';
+      job.stopReason = 'cancelled';
       job.error = 'cancelled by request';
+      job.endedAt = new Date().toISOString();
       job.disposing = true;
       this.publish();
+      const hadHandle = job.handle !== null && job.handle !== undefined;
       try { await job.handle?.dispose(); } catch {}
-      finally { job.disposing = false; this.publish(); }
+      finally {
+        // Before agents.create resolves there is no handle to dispose; run()
+        // re-checks the status after create and clears this flag itself.
+        if (hadHandle) job.disposing = false;
+        this.publish();
+        for (const w of job.waiters.splice(0)) w();
+      }
     }
     return job;
   }
@@ -721,11 +741,21 @@ export function parseWaitSeconds(value) {
 }
 
 async function readBody(req, limit = 64 * 1024) {
-  let body = '';
+  const chunks = [];
+  let bytes = 0;
   for await (const chunk of req) {
-    body += chunk;
-    if (body.length > limit) throw new Error('payload too large');
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    bytes += buf.length;
+    if (bytes > limit) {
+      const error = new Error('payload too large');
+      error.code = 'E_TOO_LARGE';
+      throw error;
+    }
+    chunks.push(buf);
   }
+  // Decode once: concatenating Buffer.toString() per chunk splits multi-byte
+  // UTF-8 characters and silently replaces them with U+FFFD.
+  const body = Buffer.concat(chunks).toString('utf8');
   return body.trim() === '' ? {} : JSON.parse(body);
 }
 

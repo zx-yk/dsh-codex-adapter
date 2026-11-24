@@ -267,7 +267,7 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
   const profile = typeof worker === 'string' ? resolveProfile(worker) : worker;
   const workspace = resolve(cwd ?? process.cwd());
   const args = buildArgs(profile, task, timeoutMs, effort);
-  const id = `cli-${nextCliId++}-${Date.now().toString(36)}`;
+  const id = `cli-${nextCliId++}-${process.pid.toString(36)}-${Date.now().toString(36)}`;
   const startedAt = new Date().toISOString();
 
   // Cwd advisory lock BEFORE the child spawns: a conflicting dispatch is

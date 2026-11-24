@@ -437,6 +437,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [hoverTask, setHoverTask] = useState<{ id: string; text: string; right: number; top: number; bottom: number; flip: boolean } | null>(null);
   const [status, setStatus] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
+  const [timeoutDraft, setTimeoutDraft] = useState<string | null>(null);
+  const [hubDraft, setHubDraft] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const [dynModels, setDynModels] = useState<Record<string, Array<{ value: string; label?: string }>>>({});
   const [presetRoster, setPresetRoster] = useState<{ defaultId?: string; presets: Array<{ id: string; name?: string; trust?: string }> }>({ presets: [] });
@@ -589,11 +591,14 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     try {
       const seq = ++jobsSeq.current;
       const [j, s, c, pr] = await Promise.all([get('/jobs'), get('/install/status'), get('/config'), get('/presets')]);
+      const failure = !j.ok ? j : !s.ok ? s : !c.ok ? c : !pr.ok ? pr : null;
+      if (failure) setLoadError(String(failure.error ?? copy.emptyResponse('/config', failure.status ?? 0)));
+      else setLoadError('');
       // A slower mount-time snapshot must not overwrite a newer poll.
       if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []);
       if (s.ok) setStatus(s.status);
       if (c.ok) {
-        setConfig((prev: any) => prev ?? c.config);
+        setConfig(c.config);
         // The desktop host binds an OS-assigned port on every launch, so the
         // stored hub_url goes stale and host-side MCP shims fall back to
         // standalone mode. Opening this page is the natural moment to repoint
@@ -607,7 +612,6 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         }
       }
       if (pr.ok) setPresetRoster({ defaultId: pr.defaultId, presets: pr.presets ?? [] });
-      setLoadError('');
     } catch (e: any) { setLoadError(String(e?.message ?? e)); }
   }, [get, post, mergeJobs]);
 
@@ -615,10 +619,20 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     void refreshAll();
     const timer = setInterval(() => {
       const seq = ++jobsSeq.current;
-      void get('/jobs').then((j) => { if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []); }).catch(() => {});
+      void get('/jobs').then((j) => { if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []); else if (!j.ok) setLoadError(String(j.error ?? copy.emptyResponse('/jobs', j.status ?? 0))); }).catch((e) => setLoadError(String(e?.message ?? e)));
     }, 3000);
     return () => clearInterval(timer);
   }, [refreshAll, get, mergeJobs]);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void refreshAll(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [refreshAll]);
 
   const act = useCallback(async (target: string, confirmName?: string, noteKey = target) => {
     if (confirmName && !window.confirm(copy.confirmRestore(confirmName))) return;
@@ -1146,18 +1160,19 @@ function WorkersPanel({ ctx }: { ctx: any }) {
             <CustomSelect value={config.mode} onChange={(v) => field('mode', v)}
               options={(['hub', 'auto', 'standalone'] as const).map((m) => ({ value: m, label: copy.modeDesc[m] }))} /></label>
           <label style={S.field}><span style={S.fieldLabel}>{copy.timeout}</span>
-            <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} type="number" min={60} max={7200} value={config.default_timeout_seconds}
-              onChange={(e) => fieldLocal('default_timeout_seconds', Number(e.target.value))}
+            <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} type="number" min={60} max={7200} value={timeoutDraft ?? config.default_timeout_seconds}
+              onChange={(e) => setTimeoutDraft(e.target.value)}
               onBlur={() => {
-                const n = Number(config.default_timeout_seconds);
+                const n = Number(timeoutDraft ?? config.default_timeout_seconds);
                 const safe = !Number.isFinite(n) || n < 60 ? 1800 : Math.min(7200, Math.round(n));
+                setTimeoutDraft(null);
                 if (safe !== n) setConfig((c: any) => ({ ...c, default_timeout_seconds: safe }));
                 void applyPatch({ default_timeout_seconds: safe });
               }} /></label>
           <label style={S.field}><span style={S.fieldLabel}>{copy.hubUrl}</span>
-            <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} value={config.hub_url}
-              onChange={(e) => fieldLocal('hub_url', e.target.value)}
-              onBlur={() => applyPatch({ hub_url: config.hub_url })}
+            <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} value={hubDraft ?? config.hub_url}
+              onChange={(e) => setHubDraft(e.target.value)}
+              onBlur={() => { const value = hubDraft ?? config.hub_url; setHubDraft(null); void applyPatch({ hub_url: value }); }}
               onKeyDown={(e: any) => { if (e.key === 'Enter') e.currentTarget.blur(); }} /></label>
         </>))}
 
@@ -1556,7 +1571,10 @@ export function apply(ctx: any): void {
         const n = r.ok ? (r.jobs ?? []).filter((j: any) => j.status === 'running' && j.originWriterAlive !== false).length : 0;
         if (n !== runningCount) {
           runningCount = n;
-          dispose(); dispose = register(); // slots/changed → nav re-renders the label
+          // Do NOT re-register here: a new slot entry identity remounts the
+          // whole settings panel (losing an open config form/expanded job).
+          // The panel header already shows the live count; the nav label picks
+          // it up on the next normal settings render.
         }
       } catch { /* hub restarting */ }
     };

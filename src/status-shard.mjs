@@ -72,25 +72,29 @@ export function readMergedStatus({ excludeWriter } = {}) {
         if (file) { try { rmSync(file, { force: true }); } catch {} }
         return;
       }
-      if (!shardFresh(shard.updatedAt, now)) {
+      const fresh = shardFresh(shard.updatedAt, now);
+      const writerAlive = writerProcessAlive(shard.writer);
+      if (!fresh) {
         // A writer killed hard (SIGKILL, crash) never ran its exit cleanup, so
-        // its shard file lingers and every reader re-reads it forever. Once the
-        // shard is stale AND its writer is provably gone, drop the file. Unknown
-        // liveness (null) is left alone — never delete on a guess.
-        if (file && writerProcessAlive(shard.writer) === false) {
+        // its shard file lingers and every reader re-reads it forever. Drop it
+        // only when the writer is provably gone (or the shard is ancient).
+        if (file && writerAlive === false) {
           try { rmSync(file, { force: true }); } catch {}
         }
-        return;
+        // A live writer can legitimately sit in one long tool call with no
+        // event for >30 min; keep its running jobs, flagged as stale rather
+        // than making them disappear from the board.
+        if (writerAlive !== true) return;
       }
       // WPC10: expose the owning writer's liveness and last-write time so the
       // panel can flag running jobs whose instance died (orphans) instead of
       // showing them as running forever or dropping them silently.
-      const writerAlive = writerProcessAlive(shard.writer);
       for (const job of shard.jobs ?? []) {
         jobs.push({
           ...job,
           origin: shard.writer ?? 'legacy',
           originWriterAlive: writerAlive,
+          originStale: !fresh,
           originShardUpdatedAt: typeof shard.updatedAt === 'string' ? shard.updatedAt : null,
         });
       }
