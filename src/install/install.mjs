@@ -2,7 +2,7 @@
 // render Codex / agy / grok agent roles with real paths. Called from the CLI
 // entry or the DSH settings page. All edits are backed up and idempotent.
 
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync, rmdirSync, statSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync as fsWriteFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, rmSync, rmdirSync, statSync, renameSync } from 'node:fs';
 import { dirname, join, resolve, relative, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -32,9 +32,17 @@ function backup(file) {
       for (const f of old.slice(0, -3)) rmSync(join(dir, f), { force: true });
     } catch {}
     return bak;
-  } catch {
-    return null;
+  } catch (error) {
+    // A failed backup is not "nothing to back up": refuse the destructive
+    // write rather than replacing a locked/known-good config with no copy.
+    throw new Error(`cannot back up ${file}: ${error?.message ?? error}`);
   }
+}
+
+function writeAtomic(file, data) {
+  const temp = `${file}.tmp-${process.pid}`;
+  fsWriteFileSync(temp, data);
+  renameSync(temp, file);
 }
 
 function readJson(file, fallback, strict = false) {
@@ -237,7 +245,7 @@ export function writeGlobalConfig(patch) {
   mkdirSync(CONFIG_DIR_HOME(), { recursive: true });
   const next = applyGlobalConfigPatch(readGlobalConfig(), patch);
   const temp = `${GLOBAL_CONFIG_FILE}.tmp-${process.pid}`;
-  writeFileSync(temp, JSON.stringify(next, null, 2) + '\n');
+  writeAtomic(temp, JSON.stringify(next, null, 2) + '\n');
   renameSync(temp, GLOBAL_CONFIG_FILE);
   return next;
 }
@@ -338,7 +346,7 @@ export function uninstallCodex({ home = homedir(), scope } = {}) {
     const before = readFileSync(configFile, 'utf8');
     if (hasTomlTable(before, 'mcp_servers.dsh-adapter')) {
       backup(configFile);
-      writeFileSync(configFile, removeCodexMcp(before));
+      writeAtomic(configFile, removeCodexMcp(before));
       actions.push('mcp: removed dsh-adapter from config.toml (backup kept)');
     }
   }
@@ -407,7 +415,7 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
     actions.push('statusline: skipped (one already configured)');
   }
 
-  writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+  writeAtomic(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   actions.push(`settings: registered ${PLUGIN_KEY} + ${MCP_TOOLS.length} permission rules`);
 
   // Materialize the install through the claude CLI: registers the marketplace
@@ -581,14 +589,14 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
     const rendered = readFileSync(join(srcDir, f), 'utf8')
       .replace(/command = "node"/, () => `command = ${tomlString(launcher.command)}`)
       .replace(/args = \[.*server\.mjs"\]/, () => `args = [${tomlString(join(ROOT, 'src', 'server.mjs'))}]`);
-    writeFileSync(dest, rendered);
+    writeAtomic(dest, rendered);
     actions.push(`role: ${dest}`);
   }
   const promptsDir = scope === 'project' ? join(process.cwd(), '.codex', 'prompts') : join(codexDir(home), 'prompts');
   mkdirSync(promptsDir, { recursive: true });
   const promptsSrc = join(ROOT, 'codex', 'prompts');
   for (const f of readdirSync(promptsSrc).filter((f) => f.endsWith('.md'))) {
-    writeFileSync(join(promptsDir, f), readFileSync(join(promptsSrc, f), 'utf8'));
+    writeAtomic(join(promptsDir, f), readFileSync(join(promptsSrc, f), 'utf8'));
     actions.push(`prompt: ${join(promptsDir, f)}`);
   }
   // The desktop client has no subagent spawn UI; a global MCP entry lets any
@@ -601,7 +609,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
       if (hasTomlTable(before, 'mcp_servers.dsh-adapter')) {
         const bak = backup(configFile);
         if (bak) actions.push(`backup: ${bak}`);
-        writeFileSync(configFile, removeCodexMcp(before));
+        writeAtomic(configFile, removeCodexMcp(before));
         actions.push('mcp: global registration disabled — entry removed');
       } else {
         actions.push('mcp: global registration disabled');
@@ -613,7 +621,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
     const launcher = resolveNodeLauncher();
     const next = upsertCodexMcp(before, join(ROOT, 'src', 'server.mjs'), launcher);
     if (next !== before) {
-      writeFileSync(configFile, next);
+      writeAtomic(configFile, next);
       actions.push(`mcp: registered dsh-adapter globally (launcher: ${launcher.source}, approve, 3600s) — restart Codex to load it`);
     } else {
       actions.push('mcp: dsh-adapter already registered');
@@ -647,7 +655,7 @@ export function installAgy({ home = homedir() } = {}) {
   const bak = backup(mcpFile);
   if (bak) actions.push(`backup: ${bak}`);
   const cfg = readJson(mcpFile, {}, true);
-  cfg.mcpServers = cfg.mcpServers ?? {};
+  if (!cfg.mcpServers || typeof cfg.mcpServers !== 'object' || Array.isArray(cfg.mcpServers)) cfg.mcpServers = {};
   const launcher = resolveNodeLauncher();
   cfg.mcpServers['dsh-adapter'] = {
     command: launcher.command,
@@ -655,7 +663,7 @@ export function installAgy({ home = homedir() } = {}) {
     disabled: false,
     ...(launcher.env ? { env: launcher.env } : {}),
   };
-  writeFileSync(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
+  writeAtomic(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
   actions.push(`mcp: registered dsh-adapter (${launcher.source} launcher) in ${mcpFile}`);
 
   // 2. Agent definitions (no path rendering needed — agy reads the global MCP
@@ -666,7 +674,7 @@ export function installAgy({ home = homedir() } = {}) {
     const dest = join(agentsDir, f);
     const b = backup(dest);
     if (b) actions.push(`backup: ${b}`);
-    writeFileSync(dest, readFileSync(join(ROOT, 'agy', 'agents', f), 'utf8'));
+    writeAtomic(dest, readFileSync(join(ROOT, 'agy', 'agents', f), 'utf8'));
     actions.push(`agent: ${dest}`);
   }
 
@@ -676,7 +684,7 @@ export function installAgy({ home = homedir() } = {}) {
     mkdirSync(dirname(dest), { recursive: true });
     const b = backup(dest);
     if (b) actions.push(`backup: ${b}`);
-    writeFileSync(dest, readFileSync(join(ROOT, 'agy', 'skills', s, 'SKILL.md'), 'utf8'));
+    writeAtomic(dest, readFileSync(join(ROOT, 'agy', 'skills', s, 'SKILL.md'), 'utf8'));
     actions.push(`skill: ${dest}`);
   }
   return { ok: true, actions };
@@ -687,10 +695,10 @@ export function uninstallAgy({ home = homedir() } = {}) {
 
   const mcpFile = join(home, '.gemini', 'config', 'mcp_config.json');
   const cfg = readJson(mcpFile, null, true);
-  if (cfg && cfg.mcpServers && cfg.mcpServers['dsh-adapter']) {
+  if (cfg && cfg.mcpServers && typeof cfg.mcpServers === 'object' && !Array.isArray(cfg.mcpServers) && cfg.mcpServers['dsh-adapter']) {
     backup(mcpFile);
     delete cfg.mcpServers['dsh-adapter'];
-    writeFileSync(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
+    writeAtomic(mcpFile, JSON.stringify(cfg, null, 2) + '\n');
     actions.push(`mcp: removed dsh-adapter from ${mcpFile} (backup kept)`);
   }
 
@@ -760,7 +768,7 @@ export function installGrok({ home = homedir() } = {}) {
       + Object.entries(launcher.env).map(([key, value]) => `${key} = ${tomlString(value)}`).join('\n') + '\n';
   }
   toml += `\n\n${block}`;
-  writeFileSync(cfgFile, toml);
+  writeAtomic(cfgFile, toml);
   actions.push(`mcp: registered dsh-adapter (${launcher.source} launcher) in ${cfgFile}`);
 
   // 2. Agent definitions.
@@ -770,7 +778,7 @@ export function installGrok({ home = homedir() } = {}) {
     const dest = join(agentsDir, f);
     const b = backup(dest);
     if (b) actions.push(`backup: ${b}`);
-    writeFileSync(dest, readFileSync(join(ROOT, 'grok', 'agents', f), 'utf8'));
+    writeAtomic(dest, readFileSync(join(ROOT, 'grok', 'agents', f), 'utf8'));
     actions.push(`agent: ${dest}`);
   }
 
@@ -781,7 +789,7 @@ export function installGrok({ home = homedir() } = {}) {
     const dest = join(commandsDir, f);
     const b = backup(dest);
     if (b) actions.push(`backup: ${b}`);
-    writeFileSync(dest, readFileSync(join(ROOT, 'grok', 'commands', f), 'utf8'));
+    writeAtomic(dest, readFileSync(join(ROOT, 'grok', 'commands', f), 'utf8'));
     actions.push(`command: ${dest}`);
   }
   return { ok: true, actions };
@@ -800,7 +808,7 @@ export function uninstallGrok({ home = homedir() } = {}) {
       : l)).join('\n');
     if (after !== before) {
       backup(cfgFile);
-      writeFileSync(cfgFile, after.replace(/\n{3,}$/, '\n'));
+      writeAtomic(cfgFile, after.replace(/\n{3,}$/, '\n'));
       actions.push(`mcp: removed dsh-adapter from ${cfgFile} (backup kept)`);
     }
   }
@@ -845,7 +853,7 @@ export function installHudSegment({ home = homedir() } = {}) {
     if (next === cmd) return { ok: false, actions: ['worker-segment.sh present but path not replaceable; rewire manually'] };
     const bak = backup(settingsFile);
     settings.statusLine.command = next;
-    writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+    writeAtomic(settingsFile, JSON.stringify(settings, null, 2) + '\n');
     return { ok: true, actions: [...(bak ? [`backup: ${bak}`] : []), `statusLine: repointed worker-segment.sh to ${segment}`] };
   }
   let next = cmd;
@@ -858,7 +866,7 @@ export function installHudSegment({ home = homedir() } = {}) {
   else next += extra;
   const bak = backup(settingsFile);
   settings.statusLine.command = next;
-  writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+  writeAtomic(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   return { ok: true, actions: [...(bak ? [`backup: ${bak}`] : []), 'statusLine: claude-hud now runs worker-segment.sh via --extra-cmd'] };
 }
 
@@ -898,7 +906,7 @@ export async function uninstallClaudeCode({ home = homedir() } = {}) {
   if (settings.permissions?.allow) {
     settings.permissions.allow = settings.permissions.allow.filter((r) => !r.startsWith('mcp__plugin_dsh-adapter_'));
   }
-  writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+  writeAtomic(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   actions.push('settings: unregistered from settings.json (backup kept)');
 
   // Mirror install: the CLI keeps its own plugin state — known_marketplaces

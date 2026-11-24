@@ -239,10 +239,16 @@ export class WorkerRegistry {
     const pick = (wanted) => {
       if (wanted === undefined) return reasoning.defaultEffort && allowed.includes(reasoning.defaultEffort) ? reasoning.defaultEffort : allowed[0];
       if (allowed.includes(wanted)) return wanted;
-      for (const candidate of ['max', 'high', 'medium', 'low', 'off']) {
-        if (allowed.includes(candidate)) return candidate;
-      }
-      return allowed[0];
+      // Fall back to the CLOSEST supported effort, not to the most expensive
+      // one: effort:'off' must never silently become 'high'.
+      const order = ['off', 'minimal', 'low', 'medium', 'high', 'max'];
+      const target = order.indexOf(wanted);
+      if (target < 0) return allowed[0];
+      return [...allowed].sort((a, b) => {
+        const da = Math.abs((order.indexOf(a) < 0 ? 99 : order.indexOf(a)) - target);
+        const db = Math.abs((order.indexOf(b) < 0 ? 99 : order.indexOf(b)) - target);
+        return da - db;
+      })[0] ?? allowed[0];
     };
     return { effort: pick(desired), supported: allowed, source };
   }
@@ -251,7 +257,10 @@ export class WorkerRegistry {
   async probeRoute(llm, binding, effort) {
     try {
       const result = await probeProvider(llm, { ...binding, ...(effort ? { reasoningEffort: effort } : {}) }, { timeoutMs: 12000 });
-      return result.status === 'verified' || result.status === 'no_tool_call';
+      // Streaming prose is not enough for a coding worker: require the
+      // probe's tool-call nonce, otherwise auto-binding would cache a route
+      // that cannot edit anything.
+      return result.status === 'verified';
     } catch { return false; }
   }
 
@@ -609,7 +618,12 @@ export class WorkerRegistry {
       job.disposing = true;
       this.publish();
       const hadHandle = job.handle !== null && job.handle !== undefined;
-      try { await job.handle?.dispose(); } catch {}
+      try {
+        await Promise.race([
+          Promise.resolve(job.handle?.dispose()).catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 5000)),
+        ]);
+      } catch {}
       finally {
         // Before agents.create resolves there is no handle to dispose; run()
         // re-checks the status after create and clears this flag itself.

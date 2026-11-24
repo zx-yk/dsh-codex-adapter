@@ -13,7 +13,7 @@
 // defineTool output) so the hub keeps its zero-@deepseek-imports realm
 // discipline.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readCredentialRef } from './model-caps.mjs';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
@@ -64,11 +64,21 @@ function deepseekBaseUrl() {
   return base || PUBLIC_DEEPSEEK_BASE;
 }
 
+function killTree(child) {
+  try {
+    if (process.platform === 'win32') {
+      if (child.pid) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    } else if (child.pid) {
+      process.kill(-child.pid, 'SIGKILL');
+    }
+  } catch { try { child.kill('SIGKILL'); } catch {} }
+}
+
 function run(cmd, args, { timeoutMs, cwd } = {}) {
   // spawn with stdin ignored: several agent CLIs (codex in particular) behave
   // differently when handed an open interactive stdin pipe.
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     let out = '', err = '', settled = false, timer;
     const finish = (error, value) => {
       if (settled) return;
@@ -80,7 +90,7 @@ function run(cmd, args, { timeoutMs, cwd } = {}) {
       // A grandchild can inherit stdout/stderr and keep `close` from firing;
       // settle the tool call on the deadline anyway, then kill the direct
       // child. The caller must not hang past its documented timeout.
-      try { child.kill('SIGKILL'); } catch {}
+      killTree(child);
       finish(new Error(`${cmd} timed out after ${timeoutMs ?? 180_000}ms\n${err.slice(-400)}`));
     }, timeoutMs ?? 180_000);
     child.stdout.on('data', (c) => { out = (out + c).slice(-1_000_000); });
@@ -299,7 +309,7 @@ async function generateViaApi(entry, prompt, outputPath, size) {
   let buf;
   if (item?.b64_json) buf = Buffer.from(item.b64_json, 'base64');
   else if (item?.url) {
-    const r = await fetch(item.url);
+    const r = await fetch(item.url, { signal: AbortSignal.timeout(30_000) });
     if (!r.ok) throw new Error(tr(`下载生成图失败: HTTP ${r.status}`, `Failed to download the generated image: HTTP ${r.status}`));
     buf = Buffer.from(await r.arrayBuffer());
   } else {
@@ -325,6 +335,16 @@ async function describeViaCustom(entry, imagePath, question, model) {
   return (await run(...shellCommand(cmd), { timeoutMs: 240_000, cwd: dirname(imagePath) })).trim();
 }
 
+function fileStamp(path) {
+  try { const s = statSync(path); return `${s.mtimeMs}:${s.size}`; } catch { return null; }
+}
+function requireFreshOutput(path, before, label, tail) {
+  const after = fileStamp(path);
+  if (!after) throw new Error(`${label} finished but ${path} was not created. Tail:\n${tail.trim().slice(-300)}`);
+  if (before !== null && after === before) throw new Error(`${label} finished but ${path} was not rewritten (stale file would be reported as success)`);
+  return path;
+}
+
 async function generateViaCustom(entry, prompt, outputPath, size) {
   const template = entry.imagegen_command;
   if (!template || !template.includes('{prompt}') || !template.includes('{output}')) {
@@ -336,11 +356,9 @@ async function generateViaCustom(entry, prompt, outputPath, size) {
     .replaceAll('{prompt}', shq(prompt))
     .replaceAll('{output}', shq(outputPath))
     .replaceAll('{size}', shq(size ?? ''));
+  const before = fileStamp(outputPath);
   const out = await run(...shellCommand(cmd), { timeoutMs: 480_000, cwd: dirname(outputPath) });
-  if (!existsSync(outputPath)) {
-    throw new Error(`custom command finished but ${outputPath} was not created. Tail:\n${out.trim().slice(-300)}`);
-  }
-  return outputPath;
+  return requireFreshOutput(outputPath, before, 'custom command', out);
 }
 
 async function generateViaCodex(prompt, outputPath, size) {
@@ -348,22 +366,18 @@ async function generateViaCodex(prompt, outputPath, size) {
   // write lands inside its sandbox's writable root regardless of policy.
   const { dirname, basename } = await import('node:path');
   const task = `$imagegen ${prompt}. Save exactly one image to ./${basename(outputPath)} in the current directory.${size ? ` Target size ${size}.` : ''}`;
+  const before = fileStamp(outputPath);
   const out = await run('codex', ['exec', '--skip-git-repo-check', task], { timeoutMs: 480_000, cwd: dirname(outputPath) });
-  if (!existsSync(outputPath)) {
-    throw new Error(`codex finished but ${outputPath} was not created. Tail of output:\n${out.trim().slice(-400)}`);
-  }
-  return outputPath;
+  return requireFreshOutput(outputPath, before, 'codex', out);
 }
 
 async function generateViaGrok(prompt, outputPath) {
   // Grok Build CLI: native generate_image tool, saves straight into cwd.
   const { dirname, basename } = await import('node:path');
   const p = `Use your generate_image tool to create: ${prompt}. Save it to ./${basename(outputPath)} in the current directory (convert to the requested format if needed). Reply with the saved path.`;
+  const before = fileStamp(outputPath);
   const out = await run('grok', ['-p', p], { timeoutMs: 480_000, cwd: dirname(outputPath) });
-  if (!existsSync(outputPath)) {
-    throw new Error(`grok finished but ${outputPath} was not created. Tail:\n${out.trim().slice(-300)}`);
-  }
-  return outputPath;
+  return requireFreshOutput(outputPath, before, 'grok', out);
 }
 
 async function generateViaAgy(prompt, outputPath) {
@@ -519,7 +533,10 @@ export async function testProvider(entry, lang) {
   }
 
   // CLI: check the executables exist, then actually run the vision command.
-  const bin = (cmd) => String(cmd).trim().split(/\s+/)[0];
+  const bin = (cmd) => {
+    const m = String(cmd).trim().match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
+    return m ? (m[1] ?? m[2] ?? m[3] ?? '') : '';
+  };
   if (entry.vision_command) {
     try {
       const which = (await run(...shellCommand(`${IS_WIN ? 'where' : 'command -v'} ${shq(bin(entry.vision_command))}`), { timeoutMs: 15_000 })).trim();

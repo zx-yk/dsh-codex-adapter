@@ -64,7 +64,7 @@ export function publishStatus() {
   // without this they never reach history.jsonl and the History tab silently
   // loses every job the user did not run through the hub.
   for (const job of jobs.values()) {
-    if (!HISTORY_TERMINAL.has(job.status) || recorded.has(job.id)) continue;
+    if (!HISTORY_TERMINAL.has(job.status) || !job.endedAt || recorded.has(job.id)) continue;
     try { appendHistory(job); recorded.add(job.id); } catch { /* history is best-effort */ }
   }
   pruneSettledJobs();
@@ -378,6 +378,7 @@ export async function cancelJob(id) {
   if (job.status !== 'running') return job;
   job.status = 'cancelled';
   job.error = 'cancelled by request';
+  job.endedAt = job.endedAt ?? new Date().toISOString();
   try { await job.harness.close(); } catch {}
   publishStatus();
   return job;

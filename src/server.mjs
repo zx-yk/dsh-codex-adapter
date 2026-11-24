@@ -148,7 +148,17 @@ async function acquireDispatchLock({ cwd, backend, mode, allowConcurrent }) {
     try {
       return acquireCwdLock({ cwd, jobId: null, backend, mode, startedAt: new Date().toISOString(), allowConcurrent });
     } catch (err) {
-      if (!(err instanceof CwdLockError) || attempt > 0 || err.holder.mode !== 'hub') throw err;
+      if (!(err instanceof CwdLockError) || attempt > 0) throw err;
+      if (err.holder.mode !== 'hub') {
+        // A local standalone/CLI job can be terminal while its harness is
+        // still closing; only release after the job itself released the lock.
+        const local = getJob(err.holder.jobId);
+        if (local && local.status !== 'running' && local._releaseCwdLock == null) {
+          releaseCwdLockByJobId(err.holder.jobId);
+          continue;
+        }
+        throw err;
+      }
       // The holder may still be inside hub.spawn: its jobId is null until the
       // spawn response comes back. "null" is not "no such job" — probing it
       // would release the in-flight lock and let two writers into one cwd.
@@ -312,8 +322,13 @@ server.registerTool('dsh_worker_probe', {
   inputSchema: { tier: z.enum(['flash', 'pro']).optional(), provider: z.string().optional(), model: z.string().optional() },
 }, async ({ tier, provider, model }) => {
   if (!(await hubAvailable())) return text({ status: 'hub_unavailable', tool_call_verified: false });
-  const bound = bindingForTier(tier ?? sessionConfig.default_tier);
-  return text(await hub.probe({ provider: provider?.trim() || bound.provider, model: model?.trim() || bound.model }));
+  const t = applyTierPolicy(tier ?? sessionConfig.default_tier);
+  const bound = bindingForTier(t);
+  const fallback = resolveTierBinding(t, sessionConfig);
+  return text(await hub.probe({
+    provider: provider?.trim() || bound.provider || fallback.provider,
+    model: model?.trim() || bound.model || fallback.model,
+  }));
 });
 
 server.registerTool('dsh_worker_config', {

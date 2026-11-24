@@ -44,11 +44,20 @@ function isTranscriptFor(block, imageBlock) {
  * transcription that follows each one already carries the content, so the image
  * block is dropped rather than replaced with a placeholder.
  */
-function stripImages(content) {
+function stripImages(content, visionEnabled = true) {
   if (!Array.isArray(content)) return content;
   if (!content.some((b) => b?.type === 'image')) return content;
+  if (!visionEnabled) {
+    return content.map((b) => b?.type === 'image'
+      ? { type: 'text', text: tr('[视觉桥已关闭，图片未分析]', '[vision bridge disabled — image not analyzed]') }
+      : b);
+  }
+  const hasTranscript = content.some((b) => b?.type === 'text' && TRANSCRIPT_MARKERS.some((m) => b.text?.startsWith(m)));
   const out = content.filter((b) => b?.type !== 'image');
-  return out.length > 0 ? out : [{ type: 'text', text: tr('[图片已由视觉桥转写，详见随后的描述]', '[image transcribed by the vision bridge — see the description that follows]') }];
+  if (out.length > 0 && hasTranscript) return out;
+  return content.map((b) => b?.type === 'image'
+    ? { type: 'text', text: tr('[图片未转写，当前模型看不到它]', '[image not transcribed; this model cannot see it]') }
+    : b);
 }
 
 export function installVisionRoute(ctx, getConfig) {
@@ -72,7 +81,8 @@ export function installVisionRoute(ctx, getConfig) {
       // NOTE: routing reads top-level options.provider (adapterStream uses
       // this.registration(options.provider)); rewriting anything else
       // self-recurses into this adapter.
-      const messages = options.messages?.map((m) => ({ ...m, content: stripImages(m.content) })) ?? options.messages;
+      const visionEnabled = getConfig().vision_provider !== 'off';
+      const messages = options.messages?.map((m) => ({ ...m, content: stripImages(m.content, visionEnabled) })) ?? options.messages;
       yield* llm.stream({ ...options, provider: DELEGATE, ...(messages === undefined ? {} : { messages }) });
     },
   };

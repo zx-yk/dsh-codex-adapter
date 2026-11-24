@@ -3,7 +3,7 @@
 // disappears on restart. Every terminal job is appended here once, so the
 // settings page can show a durable history board with basic aggregates.
 
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -46,13 +46,14 @@ export function historyRecord(job) {
 
 function lines() {
   if (!existsSync(FILE)) return [];
-  try { return readFileSync(FILE, 'utf8').split('\n').filter(Boolean); } catch { return []; }
+  try { return readFileSync(FILE, 'utf8').split('\n').filter(Boolean); }
+  catch { return null; } // a transient read failure is not an empty history
 }
 
 /** Ids already persisted, so a restart does not duplicate a job. */
 export function readHistoryIds() {
   const ids = new Set();
-  for (const line of lines()) {
+  for (const line of lines() ?? []) {
     try { const rec = JSON.parse(line); if (rec?.id) ids.add(rec.id); } catch { /* skip */ }
   }
   return ids;
@@ -62,8 +63,12 @@ function pruneIfNeeded() {
   try {
     if (statSync(FILE).size <= MAX_BYTES) return;
   } catch { return; }
-  const kept = lines().slice(-MAX_RECORDS);
-  writeFileSync(FILE, kept.join('\n') + (kept.length ? '\n' : ''));
+  const all = lines();
+  if (all === null) return;
+  const kept = all.slice(-MAX_RECORDS);
+  const temp = `${FILE}.tmp-${process.pid}`;
+  writeFileSync(temp, kept.join('\n') + (kept.length ? '\n' : ''));
+  renameSync(temp, FILE);
 }
 
 export function appendHistory(job) {
@@ -75,7 +80,7 @@ export function appendHistory(job) {
 /** Newest first, filtered and paged. */
 export function readHistory({ limit = 100, offset = 0, tier, status, source } = {}) {
   const records = [];
-  for (const line of lines()) {
+  for (const line of lines() ?? []) {
     let rec;
     try { rec = JSON.parse(line); } catch { continue; }
     if (!rec?.id) continue;

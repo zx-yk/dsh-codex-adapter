@@ -15,7 +15,8 @@ export const SHARD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** A shard is fresh only when its timestamp parses and is inside the window. */
 export function shardFresh(updatedAt, now = Date.now()) {
   const t = Date.parse(updatedAt);
-  return Number.isFinite(t) && now - t <= SHARD_FRESH_MS;
+  // A backward clock jump must not make a shard fresh forever.
+  return Number.isFinite(t) && t <= now + 60_000 && now - t <= SHARD_FRESH_MS;
 }
 
 export function createShardWriter(kind) {
@@ -68,7 +69,7 @@ export function readMergedStatus({ excludeWriter } = {}) {
       const updated = Date.parse(shard.updatedAt);
       // A pid can be recycled by an unrelated process, so writer-alive alone
       // must not keep a malformed/ancient shard on the board forever.
-      if (!Number.isFinite(updated) || now - updated > SHARD_MAX_AGE_MS) {
+      if (!Number.isFinite(updated) || updated > now + 60_000 || now - updated > SHARD_MAX_AGE_MS) {
         if (file) { try { rmSync(file, { force: true }); } catch {} }
         return;
       }

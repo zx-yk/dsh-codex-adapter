@@ -50,7 +50,7 @@ export function writeCapsCache(provider, entry) {
 
 export function capsFor(cache, provider, ttlSeconds = DEFAULT_TTL_SECONDS) {
   const entry = cache?.providers?.[provider];
-  if (!entry || typeof entry.fetchedAt !== 'string') return undefined;
+  if (!entry || typeof entry.fetchedAt !== 'string' || entry.error) return undefined;
   const age = Date.now() - Date.parse(entry.fetchedAt);
   if (!Number.isFinite(age) || age > ttlSeconds * 1000) return undefined;
   return entry;

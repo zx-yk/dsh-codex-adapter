@@ -348,6 +348,7 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
     job.status = 'failed';
     job.stopReason = 'timeout';
     job.error = `timed out after ${Math.round(timeoutMs / 1000)}s (CLI process group killed)`;
+    job.endedAt = new Date().toISOString();
     job.liveness = 'stalled';
     publishStatus();
     killGroup(child);
