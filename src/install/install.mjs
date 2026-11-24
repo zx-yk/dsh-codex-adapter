@@ -22,6 +22,15 @@ function backup(file) {
     const current = readFileSync(file);
     if (existsSync(bak) && readFileSync(bak).equals(current)) return null;
     copyFileSync(file, bak);
+    // Retain a small ring of backups from older versions; the rolling one
+    // above is the only one future installs will create.
+    try {
+      const dir = dirname(file);
+      const name = file.split(/[\\/]/).pop();
+      const prefix = `${name}.dsh-adapter-backup-`;
+      const old = readdirSync(dir).filter((f) => f.startsWith(prefix)).sort();
+      for (const f of old.slice(0, -3)) rmSync(join(dir, f), { force: true });
+    } catch {}
     return bak;
   } catch {
     return null;
@@ -175,7 +184,22 @@ export const GLOBAL_CONFIG_DEFAULTS = {
 };
 
 export function readGlobalConfig() {
-  return { ...GLOBAL_CONFIG_DEFAULTS, ...readJson(GLOBAL_CONFIG_FILE, {}) };
+  let parsed;
+  try { parsed = JSON.parse(readFileSync(GLOBAL_CONFIG_FILE, 'utf8')); }
+  catch (error) {
+    if (error?.code !== 'ENOENT') {
+      // Keep one copy of the broken file for recovery, then fall back to
+      // defaults. Never silently pretend the user's real settings were empty.
+      const quarantine = `${GLOBAL_CONFIG_FILE}.corrupt`;
+      try {
+        if (!existsSync(quarantine) || statSync(quarantine).size !== statSync(GLOBAL_CONFIG_FILE).size) {
+          copyFileSync(GLOBAL_CONFIG_FILE, quarantine);
+        }
+      } catch {}
+    }
+    return { ...GLOBAL_CONFIG_DEFAULTS };
+  }
+  return { ...GLOBAL_CONFIG_DEFAULTS, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
 }
 
 /**
@@ -551,7 +575,9 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
     const dest = join(agentsDir, f);
     const bak = backup(dest);
     if (bak) actions.push(`backup: ${bak}`);
+    const launcher = resolveNodeLauncher();
     const rendered = readFileSync(join(srcDir, f), 'utf8')
+      .replace(/command = "node"/, () => `command = ${tomlString(launcher.command)}`)
       .replace(/args = \[.*server\.mjs"\]/, () => `args = [${tomlString(join(ROOT, 'src', 'server.mjs'))}]`);
     writeFileSync(dest, rendered);
     actions.push(`role: ${dest}`);

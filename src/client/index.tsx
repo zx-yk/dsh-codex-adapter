@@ -352,6 +352,7 @@ function CustomSelect({ value, options, onChange, minWidth }: {
   onChange: (v: string) => void; minWidth?: number;
 }) {
   const [open, setOpen] = useState<{ left: number; top: number; bottom: number; width: number; up: boolean } | null>(null);
+  const [active, setActive] = useState(0);
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(null);
@@ -369,21 +370,38 @@ function CustomSelect({ value, options, onChange, minWidth }: {
     };
   }, [open]);
   const current = options.find((o) => o.value === value);
+  const choose = (v: string) => { onChange(v); setOpen(null); };
+  const openMenu = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    const up = window.innerHeight - r.bottom < 240;
+    setActive(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen({ left: r.left, top: r.bottom + 4, bottom: window.innerHeight - r.top + 4, width: Math.max(r.width, 130), up });
+  };
+  const onKeyDown = (e: any) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMenu(e.currentTarget); }
+      return;
+    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(options.length - 1, i + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(0, i - 1)); }
+    else if (e.key === 'Home') { e.preventDefault(); setActive(0); }
+    else if (e.key === 'End') { e.preventDefault(); setActive(options.length - 1); }
+    else if (e.key === 'Enter') { e.preventDefault(); const o = options[active]; if (o) choose(o.value); }
+    else if (e.key === 'Escape') { e.preventDefault(); setOpen(null); }
+  };
   return (<>
     <button type="button"
       style={{ ...S.input, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minWidth: minWidth ?? 92, width: '100%', boxSizing: 'border-box' as const, justifyContent: 'space-between' }}
+      aria-haspopup="listbox" aria-expanded={!!open}
       onMouseDown={(e: any) => e.stopPropagation()}
-      onClick={(e: any) => {
-        if (open) { setOpen(null); return; }
-        const r = e.currentTarget.getBoundingClientRect();
-        const up = window.innerHeight - r.bottom < 240;
-        setOpen({ left: r.left, top: r.bottom + 4, bottom: window.innerHeight - r.top + 4, width: Math.max(r.width, 130), up });
-      }}>
+      onKeyDown={onKeyDown}
+      onClick={(e: any) => { if (open) setOpen(null); else openMenu(e.currentTarget); }}>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current?.label ?? value}</span>
       <span style={{ opacity: 0.5, fontSize: 10 }}>▾</span>
     </button>
     {open && createPortal(
       <div
+        role="listbox" tabIndex={-1}
         style={{
           position: 'fixed', left: open.left, ...(open.up ? { bottom: open.bottom } : { top: open.top }),
           minWidth: open.width, zIndex: 9999, background: 'Canvas', color: 'CanvasText',
@@ -391,12 +409,13 @@ function CustomSelect({ value, options, onChange, minWidth }: {
           boxShadow: '0 8px 28px rgba(0,0,0,0.22)', padding: 4, maxHeight: 240, overflowY: 'auto',
         }}
         onMouseDown={(e: any) => e.stopPropagation()}>
-        {options.map((o) => (
-          <div key={o.value}
-            onClick={() => { onChange(o.value); setOpen(null); }}
+        {options.map((o, index) => (
+          <div key={o.value} role="option" aria-selected={o.value === value}
+            onMouseEnter={() => setActive(index)}
+            onClick={() => choose(o.value)}
             style={{
               padding: '5px 10px', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, whiteSpace: 'nowrap',
-              background: o.value === value ? 'rgba(128,128,128,0.16)' : 'transparent',
+              background: o.value === value ? 'rgba(128,128,128,0.16)' : index === active ? 'rgba(128,128,128,0.10)' : 'transparent',
               display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center',
             }}
             onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.24)'; }}
@@ -444,6 +463,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [killing, setKilling] = useState<Record<string, boolean>>({});
 
   const [jobsLoaded, setJobsLoaded] = useState(false); // first OK snapshot arrived
+  const expandedJobRef = useRef<string | null>(null);
   const [hoverTask, setHoverTask] = useState<{ id: string; text: string; right: number; top: number; bottom: number; flip: boolean } | null>(null);
   const [status, setStatus] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -533,6 +553,26 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   // reaching a terminal state is rendered as orphaned instead of vanishing.
   useEffect(() => { writeGhosts(ghosts); }, [ghosts]);
   const mergeJobs = useCallback((fresh: any[]) => {
+    const ids = new Set((fresh ?? []).map((j) => j?.id).filter(Boolean));
+    const keep = (id: string) => ids.has(id) || id === expandedJobRef.current;
+    setJobEvents((prev) => {
+      const next: typeof prev = {};
+      for (const [id, value] of Object.entries(prev)) if (keep(id)) next[id] = value;
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+    for (const id of Object.keys(jobCursor.current)) if (!keep(id)) delete jobCursor.current[id];
+    for (const id of Object.keys(terminalFetched.current)) if (!keep(id)) delete terminalFetched.current[id];
+    for (const id of Object.keys(procProbeAt.current)) if (!keep(id)) delete procProbeAt.current[id];
+    setProcProbe((prev) => {
+      const next: typeof prev = {};
+      for (const [id, value] of Object.entries(prev)) if (keep(id)) next[id] = value;
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+    setKilling((prev) => {
+      const next: typeof prev = {};
+      for (const [id, value] of Object.entries(prev)) if (keep(id)) next[id] = value;
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
     setJobs(fresh);
     setJobsLoaded(true);
     setGhosts((g) => reconcileGhosts(fresh, g, Date.now()));
@@ -551,6 +591,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   }, [withLang]);
 
   useEffect(() => { ghostsRef.current = ghosts; }, [ghosts]);
+  useEffect(() => { expandedJobRef.current = expandedJob; }, [expandedJob]);
 
   // Batch probe of pid-carrying ghost tombstones, throttled per ghost id
   // (dueProcProbes) so the 3s refresh loop never turns into a probe storm.
@@ -780,26 +821,30 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     const extras = (extraModels[p] ?? []).filter((m) => !base.some((o) => o.value === m)).map((m) => ({ value: m }));
     return [...base, ...extras];
   })();
-  const commitModelAdd = () => {
+  const commitModelAdd = async () => {
     const m = (modelAdd ?? '').trim();
     setModelAdd(null);
     if (m === '' || !config) return;
     const p = config.vision_provider;
-    const cur = extraModels[p] ?? [];
-    const nextExtra = { ...extraModels, [p]: cur.includes(m) ? cur : [...cur, m] };
+    const latest = await get('/config').catch(() => null);
+    const baseExtra = latest?.ok ? (latest.config?.extra_models ?? {}) : extraModels;
+    const cur = baseExtra[p] ?? [];
+    const nextExtra = { ...baseExtra, [p]: cur.includes(m) ? cur : [...cur, m] };
     setConfig((c: any) => ({ ...c, extra_models: nextExtra, vision_model: m }));
     applyPatch({ extra_models: nextExtra, vision_model: m });
   };
-  const removeCurrentModel = () => {
+  const removeCurrentModel = async () => {
     if (!config) return;
     const p = config.vision_provider;
     const m = config.vision_model;
-    const nextExtra = { ...extraModels, [p]: (extraModels[p] ?? []).filter((x) => x !== m) };
+    const latest = await get('/config').catch(() => null);
+    const baseExtra = latest?.ok ? (latest.config?.extra_models ?? {}) : extraModels;
+    const nextExtra = { ...baseExtra, [p]: (baseExtra[p] ?? []).filter((x: string) => x !== m) };
     const fallback = visionModelOptions.find((o) => o.value !== m)?.value ?? 'default';
     setConfig((c: any) => ({ ...c, extra_models: nextExtra, vision_model: fallback }));
     applyPatch({ extra_models: nextExtra, vision_model: fallback });
   };
-  const saveProviderForm = () => {
+  const saveProviderForm = async () => {
     if (!provForm || !config) return;
     const name = provForm.name.trim();
     if (name === '') { setNotice(copy.needName); return; }
@@ -827,9 +872,13 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         imagegen_model: provForm.imagegen_model.trim(),
       }
       : { id, name, type: 'cli', models, vision_command, imagegen_command };
+    // Re-read before replacing the array so a provider added in another
+    // window between load and save is not silently dropped.
+    const latest = await get('/config').catch(() => null);
+    const base = latest?.ok ? (latest.config?.custom_providers ?? []).filter((p: any) => !p.auto) : userProviders;
     const next = provForm.originalId
-      ? userProviders.map((p) => (p.id === provForm.originalId ? entry : p))
-      : [...userProviders, entry];
+      ? base.map((p: any) => (p.id === provForm.originalId ? entry : p))
+      : [...base, entry];
     field('custom_providers', next);
     setProvForm(null);
   };
@@ -859,9 +908,11 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       </div>
     );
   };
-  const deleteProvider = (id: string) => {
+  const deleteProvider = async (id: string) => {
     if (!config) return;
-    const patch: any = { custom_providers: userProviders.filter((p) => p.id !== id) };
+    const latest = await get('/config').catch(() => null);
+    const base = latest?.ok ? (latest.config?.custom_providers ?? []).filter((p: any) => !p.auto) : userProviders;
+    const patch: any = { custom_providers: base.filter((p: any) => p.id !== id) };
     if (config.vision_provider === id) { patch.vision_provider = 'claude-code'; patch.vision_model = 'haiku'; }
     if (config.imagegen_provider === id) patch.imagegen_provider = 'codex';
     setConfig((c: any) => ({ ...c, ...patch }));
@@ -938,7 +989,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     const ev = jobEvents[job.id];
     return (
       <Fragment key={job.id}>
-      <tr onClick={() => toggleJob(job.id)} title={copy.eventsHint}
+      <tr onClick={() => toggleJob(job.id)} title={copy.eventsHint} role="button" tabIndex={0} aria-expanded={expanded}
+        onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleJob(job.id); } }}
         style={{ cursor: 'pointer', ...(job.status === 'orphaned' ? { background: 'rgba(240,136,62,0.05)' } : {}) }}>
         <td style={{ ...S.tight, ...S.mono }} title={job.origin ? `${job.id} · ${job.origin}` : job.id}>{String(job.id).replace(/-[a-z0-9]+$/, '')}</td>
         <td style={S.tight}><span style={S.chip(job.source === 'claude-code' || job.source === 'codex')}>{sourceLabel(job.source)}</span></td>

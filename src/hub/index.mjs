@@ -1003,7 +1003,14 @@ export async function apply(ctx) {
             const deadline = Date.now() + Math.min(wait, 300) * 1000;
             for (;;) {
               const live = hub.jobs.get(parts[0]);
-              if (!live) return sendJson(res, 404, { ok: false, error: 'no such job' });
+              if (!live) {
+                const foreign = readMergedStatus({ excludeWriter: hub.shard.writer }).some((j) => j.id === parts[0]);
+                return sendJson(res, foreign ? 409 : 404, {
+                  ok: false,
+                  error: foreign ? 'this job belongs to another writer; live events are only available from its writer' : 'no such job',
+                  ...(foreign ? { foreign: true } : {}),
+                });
+              }
               const events = (live.events ?? []).filter((e) => e.seq > after);
               if (events.length > 0 || live.status !== 'running' || Date.now() >= deadline) {
                 return sendJson(res, 200, {
@@ -1020,7 +1027,11 @@ export async function apply(ctx) {
           }
           if (req.method === 'POST' && parts.length === 2 && parts[1] === 'cancel') {
             const job = await hub.cancel(parts[0]);
-            if (!job) return sendJson(res, 404, { ok: false, error: 'no such job' });
+            if (!job) {
+              const foreign = readMergedStatus({ excludeWriter: hub.shard.writer }).some((j) => j.id === parts[0]);
+              if (foreign) return sendJson(res, 409, { ok: false, error: 'this job belongs to another writer; cancel it from that writer', foreign: true });
+              return sendJson(res, 404, { ok: false, error: 'no such job' });
+            }
             return sendJson(res, 200, { ok: true, job: hub.view(job, true) });
           }
           return sendJson(res, 404, { ok: false, error: 'unknown jobs endpoint' });
