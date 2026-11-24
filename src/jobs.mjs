@@ -5,6 +5,7 @@
 import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { createShardWriter } from './status-shard.mjs';
 import { acquireCwdLock } from './cwd-lock.mjs';
+import { appendHistory, readHistoryIds } from './history.mjs';
 import { ORIGIN_CHAIN_ENV, ORIGIN_DEPTH_ENV } from './origin-guard.mjs';
 import { readGlobalConfig } from './install/install.mjs';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +39,8 @@ function loadDotEnv() {
 }
 
 const jobs = new Map();
+const recorded = readHistoryIds();
+const HISTORY_TERMINAL = new Set(['done', 'failed', 'cancelled']);
 const SETTLED_JOB_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_SETTLED_JOBS = 500;
 let nextId = 1;
@@ -57,6 +60,13 @@ function clipTask(task, cap = 300) {
 }
 
 export function publishStatus() {
+  // Standalone/CLI jobs live in this MCP process, not in the hub registry;
+  // without this they never reach history.jsonl and the History tab silently
+  // loses every job the user did not run through the hub.
+  for (const job of jobs.values()) {
+    if (!HISTORY_TERMINAL.has(job.status) || recorded.has(job.id)) continue;
+    try { appendHistory(job); recorded.add(job.id); } catch { /* history is best-effort */ }
+  }
   pruneSettledJobs();
   shard.publish([...jobs.values()].map((j) => ({
     id: j.id, tier: j.tier, model: j.model, provider: j.provider, effort: j.effort, status: j.status, source: j.source,
@@ -120,7 +130,7 @@ export function pruneSettledJobs(now = Date.now(), map = jobs) {
   }
   terminal.sort((a, b) => a.ended - b.ended);
   for (const { id, ended } of terminal) {
-    if (now - ended > SETTLED_JOB_TTL_MS) map.delete(id);
+    if (now - ended > SETTLED_JOB_TTL_MS) { map.delete(id); if (map === jobs) recorded.delete(id); }
   }
   const settled = [...map.entries()]
     .filter(([, job]) => job.status !== 'running' && job.endedAt)
@@ -128,6 +138,7 @@ export function pruneSettledJobs(now = Date.now(), map = jobs) {
   while (settled.length > MAX_SETTLED_JOBS) {
     const [id] = settled.shift();
     map.delete(id);
+    if (map === jobs) recorded.delete(id);
   }
 }
 

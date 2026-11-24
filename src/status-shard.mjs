@@ -10,6 +10,7 @@ import { homedir } from 'node:os';
 const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 const SHARD_DIR = join(CONFIG_DIR, 'status.d');
 export const SHARD_FRESH_MS = 30 * 60 * 1000;
+export const SHARD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** A shard is fresh only when its timestamp parses and is inside the window. */
 export function shardFresh(updatedAt, now = Date.now()) {
@@ -64,6 +65,13 @@ export function readMergedStatus({ excludeWriter } = {}) {
     try {
       const shard = JSON.parse(raw);
       if (shard.writer === excludeWriter) return;
+      const updated = Date.parse(shard.updatedAt);
+      // A pid can be recycled by an unrelated process, so writer-alive alone
+      // must not keep a malformed/ancient shard on the board forever.
+      if (!Number.isFinite(updated) || now - updated > SHARD_MAX_AGE_MS) {
+        if (file) { try { rmSync(file, { force: true }); } catch {} }
+        return;
+      }
       if (!shardFresh(shard.updatedAt, now)) {
         // A writer killed hard (SIGKILL, crash) never ran its exit cleanup, so
         // its shard file lingers and every reader re-reads it forever. Once the

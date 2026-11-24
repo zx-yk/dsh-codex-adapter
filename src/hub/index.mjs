@@ -134,6 +134,9 @@ const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 // is a slow memory leak in exactly the long-lived process that must stay up.
 const SETTLED_JOB_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_SETTLED_JOBS = 500;
+// An auto-bound route is a cache entry, not a permanent fact: a local model can
+// be unloaded or a provider removed while the host keeps running.
+const AUTO_ROUTE_TTL_MS = 5 * 60 * 1000;
 
 // ---------- job registry ----------
 
@@ -262,11 +265,17 @@ export class WorkerRegistry {
    */
   async resolveUsableTier(tier, bound, effort) {
     this.autoTier ??= {};
-    const cacheKey = tier + ':' + effort;
-    if (this.autoTier[cacheKey]) return this.autoTier[cacheKey];
+    const cacheKey = tier + ':' + effort + ':' + bound.provider + ':' + bound.model;
+    const cached = this.autoTier[cacheKey];
+    if (cached && Date.now() - (cached.at ?? 0) < AUTO_ROUTE_TTL_MS) return cached;
     const llm = this.ctx?.get?.('llm') ?? this.ctx?.llm;
-    if (!llm) return { binding: bound, effort };
-    if (await this.probeRoute(llm, bound, effort)) { this.autoTier[cacheKey] = { binding: bound, effort }; return this.autoTier[cacheKey]; }
+    if (!llm) return cached ?? { binding: bound, effort };
+    if (cached && await this.probeRoute(llm, cached.binding, cached.effort)) {
+      cached.at = Date.now();
+      return cached;
+    }
+    if (cached) delete this.autoTier[cacheKey];
+    if (await this.probeRoute(llm, bound, effort)) { this.autoTier[cacheKey] = { binding: bound, effort, at: Date.now() }; return this.autoTier[cacheKey]; }
     const builtin = new Set(['deepseek-official', 'deepseek-account']);
     let ids = [];
     try {
@@ -298,7 +307,7 @@ export class WorkerRegistry {
         }
         if (attemptEffort === undefined && !(await this.probeRoute(llm, candidate, undefined))) continue;
       }
-      const chosen = { binding: candidate, effort: attemptEffort };
+      const chosen = { binding: candidate, effort: attemptEffort, at: Date.now() };
       this.autoTier[cacheKey] = chosen;
       try {
         writeGlobalConfig({

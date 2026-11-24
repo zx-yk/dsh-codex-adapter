@@ -424,6 +424,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
   const [jobs, setJobs] = useState<any[]>([]); // live snapshot from /jobs
   const [ghosts, setGhosts] = useState<Record<string, any>>(() => readGhosts());
+  const ghostsRef = useRef(ghosts);
 
   // WPC14: proc-alive probe results for pid-carrying ghost tombstones, keyed
   // by job id. alive: null = probe failed / hub unreachable - it must never
@@ -536,18 +537,22 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     setProcProbe((s) => ({ ...s, [id]: { at: Date.now(), alive } }));
   }, [withLang]);
 
+  useEffect(() => { ghostsRef.current = ghosts; }, [ghosts]);
+
   // Batch probe of pid-carrying ghost tombstones, throttled per ghost id
   // (dueProcProbes) so the 3s refresh loop never turns into a probe storm.
+  // Read the latest ghosts through a ref: depending on `ghosts` here would
+  // tear down the 5s timer every 3s poll and the probe would never fire.
   useEffect(() => {
     const run = () => {
-      const targets = dueProcProbes(ghosts, procProbeAt.current, Date.now());
+      const targets = dueProcProbes(ghostsRef.current, procProbeAt.current, Date.now());
       for (const t of targets) procProbeAt.current[t.id] = Date.now();
       if (targets.length > 0) void Promise.all(targets.map((t) => probeOne(t.id, t.pid)));
     };
     run();
     const timer = setInterval(run, 5000);
     return () => clearInterval(timer);
-  }, [ghosts, probeOne]);
+  }, [probeOne]);
 
   const killGhostProc = useCallback(async (id: string) => {
     const g = ghosts[id];
