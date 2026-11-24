@@ -221,7 +221,9 @@ export function applyGlobalConfigPatch(current, patch) {
     if (numeric[k]) {
       const n = Number(v);
       if (!Number.isInteger(n) || n < numeric[k][0] || n > numeric[k][1]) {
-        throw new Error(`${k} must be an integer in ${numeric[k][0]}..${numeric[k][1]}`);
+        const error = new Error(`${k} must be an integer in ${numeric[k][0]}..${numeric[k][1]}`);
+        error.status = 400;
+        throw error;
       }
       next[k] = n;
       continue;

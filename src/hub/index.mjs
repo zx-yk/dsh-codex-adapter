@@ -487,9 +487,14 @@ export class WorkerRegistry {
     };
 
     job.promise = run()
-      .catch((err) => {
+      .catch(async (err) => {
         if (job.status === 'running') job.status = 'failed';
         job.error = job.error ?? (err?.message ?? String(err));
+        // A throw after agents.create (e.g. sessions.flush) must still
+        // unregister the agent; the normal path disposes explicitly, but the
+        // catch path used to only null the reference.
+        const handle = job.handle;
+        if (handle) { try { await handle.dispose(); } catch {} }
       })
       .finally(() => {
         job.endedAt = new Date().toISOString();
@@ -1059,7 +1064,7 @@ export async function apply(ctx) {
           }
           return sendJson(res, 405, { ok: false, error: 'GET or POST' }, { allow: 'GET, POST' });
         } catch (err) {
-          return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
+          return sendJson(res, err?.status === 400 ? 400 : 500, { ok: false, error: err?.message ?? String(err) });
         }
       },
     }));
