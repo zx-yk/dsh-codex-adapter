@@ -57,8 +57,14 @@ function readGhosts(): Record<string, any> {
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch { return { ...ghostSessionMemory }; }
 }
+let lastGhostJSON = '';
 function writeGhosts(ghosts: Record<string, any>): void {
-  try { window.localStorage.setItem(GHOST_STORE_KEY, JSON.stringify(ghosts)); } catch { /* fall through to memory */ }
+  const json = JSON.stringify(ghosts);
+  // The reconcile pass refreshes lastSeenAt every poll; do not hit localStorage
+  // every 3 s when nothing observable changed.
+  if (json === lastGhostJSON) return;
+  lastGhostJSON = json;
+  try { window.localStorage.setItem(GHOST_STORE_KEY, json); } catch { /* fall through to memory */ }
   // Keep the fallback in sync even when storage works, so losing storage later
   // (quota/privacy) cannot resurrect a tombstone the user dismissed.
   for (const key of Object.keys(ghostSessionMemory)) delete ghostSessionMemory[key];
@@ -415,11 +421,9 @@ function CustomSelect({ value, options, onChange, minWidth }: {
             onClick={() => choose(o.value)}
             style={{
               padding: '5px 10px', borderRadius: 5, cursor: 'pointer', fontSize: 12.5, whiteSpace: 'nowrap',
-              background: o.value === value ? 'rgba(128,128,128,0.16)' : index === active ? 'rgba(128,128,128,0.10)' : 'transparent',
+              background: index === active ? 'rgba(128,128,128,0.22)' : o.value === value ? 'rgba(128,128,128,0.16)' : 'transparent',
               display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center',
-            }}
-            onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.24)'; }}
-            onMouseLeave={(e: any) => { e.currentTarget.style.background = o.value === value ? 'rgba(128,128,128,0.16)' : 'transparent'; }}>
+            }}>
             <span>{o.label ?? o.value}</span>{o.value === value && <span style={{ opacity: 0.6, fontSize: 11 }}>✓</span>}
           </div>
         ))}
@@ -464,6 +468,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
   const [jobsLoaded, setJobsLoaded] = useState(false); // first OK snapshot arrived
   const expandedJobRef = useRef<string | null>(null);
+  const jobsErrorRef = useRef('');
   const [hoverTask, setHoverTask] = useState<{ id: string; text: string; right: number; top: number; bottom: number; flip: boolean } | null>(null);
   const [status, setStatus] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -485,6 +490,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   ], [presetRoster, copy]);
   const [notice, setNotice] = useState('');
   const configSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const configEpoch = useRef(0);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Per-integration feedback, rendered next to the button that was pressed.
   const [rowNote, setRowNote] = useState<Record<string, { kind: 'working' | 'ok' | 'error'; text: string }>>({});
@@ -504,6 +510,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     base_url: string; api_key: string; imagegen_model: string;
     vision_command: string; imagegen_command: string;
   } | null>(null);
+  const [savingProvider, setSavingProvider] = useState(false);
   const [modelAdd, setModelAdd] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ key: string; ok?: boolean; steps?: any[]; error?: string; busy: boolean } | null>(null);
   const TABS = ['workers', 'history', 'integrations', 'config'] as const;
@@ -552,9 +559,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   // the persistent ghost registry, so a running job that disappears without
   // reaching a terminal state is rendered as orphaned instead of vanishing.
   useEffect(() => { writeGhosts(ghosts); }, [ghosts]);
+  useEffect(() => {
+    const close = () => setHoverTask(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+  }, []);
   const mergeJobs = useCallback((fresh: any[]) => {
     const ids = new Set((fresh ?? []).map((j) => j?.id).filter(Boolean));
-    const keep = (id: string) => ids.has(id) || id === expandedJobRef.current;
+    const keep = (id: string) => ids.has(id) || id === expandedJobRef.current || !!ghostsRef.current[id];
     setJobEvents((prev) => {
       const next: typeof prev = {};
       for (const [id, value] of Object.entries(prev)) if (keep(id)) next[id] = value;
@@ -573,6 +586,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       for (const [id, value] of Object.entries(prev)) if (keep(id)) next[id] = value;
       return Object.keys(next).length === Object.keys(prev).length ? prev : next;
     });
+    setHoverTask((h) => (h && !ids.has(h.id) ? null : h));
     setJobs(fresh);
     setJobsLoaded(true);
     setGhosts((g) => reconcileGhosts(fresh, g, Date.now()));
@@ -641,14 +655,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const refreshAll = useCallback(async () => {
     try {
       const seq = ++jobsSeq.current;
+      const epoch = configEpoch.current;
       const [j, s, c, pr] = await Promise.all([get('/jobs'), get('/install/status'), get('/config'), get('/presets')]);
       const failure = !j.ok ? j : !s.ok ? s : !c.ok ? c : !pr.ok ? pr : null;
       if (failure) setLoadError(String(failure.error ?? copy.emptyResponse('/config', failure.status ?? 0)));
       else setLoadError('');
       // A slower mount-time snapshot must not overwrite a newer poll.
       if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []);
-      if (s.ok) setStatus(s.status);
-      if (c.ok) {
+      if (s.ok && epoch === configEpoch.current) setStatus(s.status);
+      if (c.ok && epoch === configEpoch.current) {
         setConfig(c.config);
         // The desktop host binds an OS-assigned port on every launch, so the
         // stored hub_url goes stale and host-side MCP shims fall back to
@@ -659,10 +674,11 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         const hubUrl = String(c.config?.hub_url ?? '');
         const isLocalOrEmpty = hubUrl === '' || /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(hubUrl);
         if (/^https?:\/\//.test(origin) && isLocalOrEmpty && hubUrl !== origin) {
-          void post('/config', { hub_url: origin }).then((r) => { if (r.ok) setConfig(r.config); }).catch(() => {});
+          configEpoch.current++;
+          void post('/config', { hub_url: origin }).then((r) => { if (r.ok) { configEpoch.current++; setConfig(r.config); } }).catch(() => {});
         }
       }
-      if (pr.ok) setPresetRoster({ defaultId: pr.defaultId, presets: pr.presets ?? [] });
+      if (pr.ok && epoch === configEpoch.current) setPresetRoster({ defaultId: pr.defaultId, presets: pr.presets ?? [] });
     } catch (e: any) { setLoadError(String(e?.message ?? e)); }
   }, [get, post, mergeJobs]);
 
@@ -670,7 +686,22 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     void refreshAll();
     const timer = setInterval(() => {
       const seq = ++jobsSeq.current;
-      void get('/jobs').then((j) => { if (j.ok && seq === jobsSeq.current) mergeJobs(j.jobs ?? []); else if (!j.ok) setLoadError(String(j.error ?? copy.emptyResponse('/jobs', j.status ?? 0))); }).catch((e) => setLoadError(String(e?.message ?? e)));
+      void get('/jobs').then((j) => {
+        if (seq !== jobsSeq.current) return;
+        if (j.ok) {
+          if (jobsErrorRef.current) { jobsErrorRef.current = ''; setLoadError(''); }
+          mergeJobs(j.jobs ?? []);
+        } else {
+          const message = String(j.error ?? copy.emptyResponse('/jobs', j.status ?? 0));
+          jobsErrorRef.current = message;
+          setLoadError(message);
+        }
+      }).catch((e) => {
+        if (seq !== jobsSeq.current) return;
+        const message = String(e?.message ?? e);
+        jobsErrorRef.current = message;
+        setLoadError(message);
+      });
     }, 3000);
     return () => clearInterval(timer);
   }, [refreshAll, get, mergeJobs]);
@@ -702,10 +733,11 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   }, [post, get, copy]);
 
   const applyPatch = useCallback((patch: Record<string, any>): Promise<boolean> => {
+    configEpoch.current++;
     // Serialize writes so rapid edits cannot be persisted out of order. The
     // optimistic UI is reconciled with the server after every failed write.
     const save = configSaveQueue.current.then(() => persistConfigPatch(patch, {
-      post, get, onConfig: setConfig,
+      post, get, onConfig: (next) => { configEpoch.current++; setConfig(next); },
       onNotice: (message: string) => {
         if (noticeTimer.current) clearTimeout(noticeTimer.current);
         setNotice(message);
@@ -762,10 +794,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     void loadJobEvents(expandedJob);
   }, [expandedJob, loadJobEvents]);
 
+  const expandedJobStatus = expandedJob ? jobs.find((j: any) => j?.id === expandedJob)?.status ?? '' : '';
   useEffect(() => {
     if (!expandedJob) return;
     const job = jobs.find((j: any) => j?.id === expandedJob);
-    if (job && job.status !== 'running') {
+    const live = job?.status === 'running' || job?.status === 'needs_input';
+    if (job && !live) {
       const key = job.status ?? 'unknown';
       if (terminalFetched.current[expandedJob] !== key) {
         terminalFetched.current[expandedJob] = key;
@@ -780,10 +814,11 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     if (!job) return;
     const timer = setInterval(() => { void loadJobEvents(expandedJob); }, 2000);
     return () => clearInterval(timer);
-  }, [expandedJob, jobs, loadJobEvents]);
+  }, [expandedJob, expandedJobStatus, loadJobEvents]);
 
   /** Selects & checkboxes: apply immediately. */
   const field = (key: string, value: any) => {
+    configEpoch.current++;
     setConfig((c: any) => ({ ...c, [key]: value }));
     applyPatch({ [key]: value });
   };
@@ -845,7 +880,9 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     applyPatch({ extra_models: nextExtra, vision_model: fallback });
   };
   const saveProviderForm = async () => {
-    if (!provForm || !config) return;
+    if (!provForm || !config || savingProvider) return;
+    setSavingProvider(true);
+    try {
     const name = provForm.name.trim();
     if (name === '') { setNotice(copy.needName); return; }
     const models = provForm.models.split(/[,，\n]+/).map((s) => s.trim()).filter(Boolean);
@@ -876,11 +913,20 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     // window between load and save is not silently dropped.
     const latest = await get('/config').catch(() => null);
     const base = latest?.ok ? (latest.config?.custom_providers ?? []).filter((p: any) => !p.auto) : userProviders;
+    if (!provForm.originalId) {
+      let candidate = id;
+      let n = 2;
+      while (base.some((p: any) => p.id === candidate)) candidate = `${id}-${n++}`;
+      entry.id = candidate;
+    }
     const next = provForm.originalId
       ? base.map((p: any) => (p.id === provForm.originalId ? entry : p))
       : [...base, entry];
     field('custom_providers', next);
     setProvForm(null);
+    } finally {
+      setSavingProvider(false);
+    }
   };
   const runProviderTest = (key: string, entry: any) => {
     setTestResult({ key, busy: true });
@@ -1008,13 +1054,15 @@ function WorkersPanel({ ctx }: { ctx: any }) {
             {ghostRow && (
               <button type="button" title={copy.orphanDismiss} aria-label={copy.orphanDismiss}
                 style={{ border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 12, padding: 0, opacity: 0.55, lineHeight: 1 }}
-                onClick={(e: any) => { e.stopPropagation(); dismissGhost(job.id); }}>×</button>
+                onClick={(e: any) => { e.stopPropagation(); dismissGhost(job.id); }}
+                onKeyDown={(e: any) => e.stopPropagation()}>×</button>
             )}
           </div>
         </td>
         <td style={{ ...S.tight, ...S.mono }} title={copy.progressTip(elapsed(job.startedAt, job.endedAt), job.turn, job.step, job.toolCalls ?? '-')}>{elapsed(job.startedAt, job.endedAt)} {job.turn}.{job.step} {job.toolCalls ?? '-'}t</td>
         <td style={{ ...S.tight, ...S.mono }}>{job.tokens ? `${ktok(job.tokens.input)}/${ktok(job.tokens.output)}` : '-'}</td>
         <td
+          title={job.task || undefined}
           style={{ ...S.cell, position: 'relative' }}
           onMouseEnter={(e: any) => {
             const rect = e.currentTarget.getBoundingClientRect();
@@ -1041,7 +1089,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                 </span>
                 <button type="button" disabled={!!killing[job.id]} title={copy.procKillTip(pb.pid)}
                   style={{ flexShrink: 0, fontSize: 11, padding: '0 8px', borderRadius: 99, border: '1px solid rgba(240,136,62,0.65)', background: 'transparent', color: '#f0883e', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                  onClick={(e: any) => { e.stopPropagation(); void killGhostProc(job.id); }}>
+                  onClick={(e: any) => { e.stopPropagation(); void killGhostProc(job.id); }}
+                  onKeyDown={(e: any) => e.stopPropagation()}>
                   {killing[job.id] ? copy.procKilling : copy.procKill}
                 </button>
               </>
@@ -1376,7 +1425,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                 <div style={{ fontSize: 11.5, opacity: 0.55 }}>{copy.cliFormHint}</div>
               </>)}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button style={S.btn} onClick={saveProviderForm}>{copy.saveProvider}</button>
+                <button style={S.btn} onClick={() => void saveProviderForm()} disabled={savingProvider}>{copy.saveProvider}</button>
                 <button style={S.btn} title={copy.testTip} disabled={!!testResult?.busy}
                   onClick={() => runProviderTest('form', {
                     id: provForm.originalId ?? 'draft', name: provForm.name || 'draft', type: provForm.type,
