@@ -33,3 +33,28 @@ test('config patches cannot reach Object.prototype names', () => {
   assert.equal(Object.getPrototypeOf(next), Object.prototype);
   assert.equal(Object.hasOwn(next, 'toString'), false);
 });
+
+test('settled hub jobs are pruned by age and count, running jobs stay', () => {
+  const registry = Object.create(WorkerRegistry.prototype);
+  const now = Date.now();
+  const old = new Date(now - 7 * 60 * 60 * 1000).toISOString();
+  const recent = new Date(now - 60 * 1000).toISOString();
+  registry.jobs = new Map([
+    ['old', { id: 'old', status: 'done', endedAt: old, disposing: false }],
+    ['recent', { id: 'recent', status: 'done', endedAt: recent, disposing: false }],
+    ['running', { id: 'running', status: 'running', endedAt: null, disposing: false }],
+  ]);
+  registry.recorded = new Set(['old', 'recent']);
+  registry.pruneSettled(now);
+  assert.equal(registry.jobs.has('old'), false);
+  assert.equal(registry.jobs.has('recent'), true);
+  assert.equal(registry.jobs.has('running'), true);
+  assert.equal(registry.recorded.has('old'), false);
+
+  for (let i = 0; i < 510; i += 1) {
+    registry.jobs.set('settled-' + i, { id: 'settled-' + i, status: 'done', endedAt: recent, disposing: false });
+  }
+  registry.pruneSettled(now);
+  const settled = [...registry.jobs.values()].filter((j) => j.status !== 'running').length;
+  assert.equal(settled, 500);
+});

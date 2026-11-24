@@ -8,7 +8,7 @@ import { hubAvailable, hub } from './hub-client.mjs';
 import { startCliJob } from './cli-workers.mjs';
 import { listProfiles, resolveProfile } from './worker-profiles.mjs';
 import { readInheritedOrigin, extendOrigin, DEFAULT_ORIGIN_DEPTH_LIMIT } from './origin-guard.mjs';
-import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks, settledHubLockIds, CwdLockError } from './cwd-lock.mjs';
+import { acquireCwdLock, releaseCwdLockByJobId, updateCwdLockHolder, getCwdLocks, settledHubLockIds, hubViewTerminal, CwdLockError } from './cwd-lock.mjs';
 import { hubSpawnSpec } from './dispatch-spec.mjs';
 import { resolveWorkerCwd } from './paths.mjs';
 import { detectOrchestrator } from './process-info.mjs';
@@ -98,6 +98,20 @@ const depthLimitNow = () => sessionConfig.origin_depth_limit ?? DEFAULT_ORIGIN_D
 // hub view this session returns (the hub itself ignores the extra spawn
 // fields until the hub side adopts them).
 const hubOrigins = new Map();
+const HUB_ORIGIN_CACHE_MAX = 500;
+
+function rememberHubOrigin(jobId, origin) {
+  if (typeof jobId !== 'string' || !origin) return;
+  hubOrigins.set(jobId, origin);
+  // This MCP process is long-lived; without a cap the map grows once per hub
+  // dispatch forever. Old origins only affect the optional origin_chain fields
+  // on a later view, never the job result.
+  while (hubOrigins.size > HUB_ORIGIN_CACHE_MAX) {
+    const oldest = hubOrigins.keys().next().value;
+    if (oldest === undefined) break;
+    hubOrigins.delete(oldest);
+  }
+}
 
 function attachOrigin(view, jobId) {
   if (!view || typeof view !== 'object') return view;
@@ -132,8 +146,12 @@ async function acquireDispatchLock({ cwd, backend, mode, allowConcurrent }) {
       // would release the in-flight lock and let two writers into one cwd.
       if (typeof err.holder.jobId !== 'string' || err.holder.jobId === '') throw err;
       let settled = false;
-      try { settled = (await hub.get(err.holder.jobId, 0)).status !== 'running'; }
-      catch (e) { if (String(e?.message ?? e).includes('no such job')) settled = true; }
+      try {
+        const view = await hub.get(err.holder.jobId, 0);
+        settled = hubViewTerminal(view);
+      } catch (e) {
+        if (String(e?.message ?? e).includes('no such job')) settled = true;
+      }
       if (!settled) throw err;
       releaseCwdLockByJobId(err.holder.jobId);
     }
@@ -211,7 +229,7 @@ server.registerTool('dsh_run_worker', {
           binding: bindingForTier(t), origin: origin.origin,
         }));
         updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
-        hubOrigins.set(spawned.id, origin.origin);
+        rememberHubOrigin(spawned.id, origin.origin);
       } catch (err) {
         lock.release();
         throw err;
@@ -221,7 +239,7 @@ server.registerTool('dsh_run_worker', {
       // reported as a bare "fetch failed" while the job kept running.
       const got = await hub.get(spawned.id, timeout);
       attachOrigin(got, spawned.id);
-      if (got.status !== 'running') releaseCwdLockByJobId(spawned.id);
+      if (hubViewTerminal(got)) releaseCwdLockByJobId(spawned.id);
       return { view: got };
     }
     const origin = extendOrigin({ inherited: INHERITED_ORIGIN, backend: 'standalone', cwd: workDir, source: ORCHESTRATOR, depthLimit });
@@ -377,7 +395,7 @@ server.registerTool('dsh_spawn_worker', {
         binding: bindingForTier(t), origin: origin.origin,
       }));
       updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
-      hubOrigins.set(spawned.id, origin.origin);
+      rememberHubOrigin(spawned.id, origin.origin);
     } catch (err) {
       lock.release();
       throw err;
@@ -441,7 +459,7 @@ server.registerTool('dsh_worker_result', {
     const view = await hub.get(job_id, wait_seconds).catch((e) => ({ error: e.message }));
     if (view && view.id) {
       attachOrigin(view, view.id);
-      if (view.status !== 'running') releaseCwdLockByJobId(job_id);
+      if (hubViewTerminal(view)) releaseCwdLockByJobId(job_id);
     }
     return text(view);
   }
@@ -478,7 +496,7 @@ server.registerTool('dsh_worker_cancel', {
     const view = await hub.cancel(job_id).catch((e) => ({ error: e.message }));
     if (view && view.id) {
       attachOrigin(view, view.id);
-      releaseCwdLockByJobId(job_id); // cancelled = holder being disposed
+      if (hubViewTerminal(view)) releaseCwdLockByJobId(job_id);
     }
     return text(view);
   }

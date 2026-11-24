@@ -125,6 +125,13 @@ import { readGlobalConfig, writeGlobalConfig } from '../install/install.mjs';
 import { readCapsCache, writeCapsCache, capsFor, resolveProviderEndpoint, fetchUpstreamCaps } from '../model-caps.mjs';
 const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 
+// A hub process can run for weeks. Keep completed jobs long enough for the
+// UI/result calls to read them, then drop them: each job retains its event
+// ring, final text and (until settle) the runtime handle, so an unbounded map
+// is a slow memory leak in exactly the long-lived process that must stay up.
+const SETTLED_JOB_TTL_MS = 6 * 60 * 60 * 1000;
+const MAX_SETTLED_JOBS = 500;
+
 // ---------- job registry ----------
 
 /** Bounded task preview with a visible truncation marker (PATTERN-AUDIT D3:
@@ -352,7 +359,7 @@ export class WorkerRegistry {
       startedAt, endedAt: null, lastEventAt: startedAt, timeoutSeconds: timeoutSec,
       deadlineAt: new Date(Date.now() + timeoutSec * 1000).toISOString(),
       result: null, error: null, stopReason: null, handle: null, waiters: [],
-      texts: [], events: [], eventSeq: 0, disposing: false,
+      lastText: '', events: [], eventSeq: 0, disposing: false,
     };
     this.jobs.set(id, job);
 
@@ -384,7 +391,7 @@ export class WorkerRegistry {
           }
           const text = (event.data?.message?.content ?? [])
             .filter((c) => c?.type === 'text').map((c) => c.text).join('');
-          if (text) job.texts.push(text);
+          if (text) job.lastText = text;
           break;
         }
         case 'turn/end':
@@ -443,7 +450,7 @@ export class WorkerRegistry {
       handle.agent.followup(userMessage(task));
       await handle.agent.whenIdle();
       if (job.status === 'running') {
-        job.result = job.texts.at(-1) ?? '';
+        job.result = job.lastText ?? '';
         job.status = job.stopReason === 'completed' ? 'done' : 'failed';
       }
       if (job.status === 'failed' && !job.error) job.error = `turn ended: ${job.stopReason ?? 'unknown'}`;
@@ -458,6 +465,7 @@ export class WorkerRegistry {
       .finally(() => {
         job.endedAt = new Date().toISOString();
         job.currentTool = null;
+        job.handle = null;
         this.publish();
         for (const w of job.waiters.splice(0)) w();
       });
@@ -487,6 +495,36 @@ export class WorkerRegistry {
       try { job.handle?.dispose?.(); } catch { /* already gone */ }
       this.publish();
       for (const w of job.waiters.splice(0)) w();
+    }
+    this.pruneSettled(now);
+  }
+
+  /**
+   * Drop settled jobs after a retention window and cap the terminal backlog.
+   * The live board is a UI convenience; durable history is already written by
+   * publish(), so losing a terminal job here only changes /jobs lookups.
+   */
+  pruneSettled(now = Date.now()) {
+    const terminal = [];
+    for (const [id, job] of this.jobs) {
+      if (job.status === 'running' || job.disposing === true || !job.endedAt) continue;
+      const ended = Date.parse(job.endedAt);
+      if (Number.isFinite(ended)) terminal.push({ id, ended });
+    }
+    terminal.sort((a, b) => a.ended - b.ended);
+    for (const { id, ended } of terminal) {
+      if (now - ended > SETTLED_JOB_TTL_MS) {
+        this.jobs.delete(id);
+        this.recorded?.delete(id);
+      }
+    }
+    let settled = [...this.jobs.entries()]
+      .filter(([, job]) => job.status !== 'running' && job.disposing !== true && job.endedAt)
+      .sort((a, b) => Date.parse(a[1].endedAt) - Date.parse(b[1].endedAt));
+    while (settled.length > MAX_SETTLED_JOBS) {
+      const [id] = settled.shift();
+      this.jobs.delete(id);
+      this.recorded?.delete(id);
     }
   }
 

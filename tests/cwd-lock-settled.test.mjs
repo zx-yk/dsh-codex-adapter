@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { settledHubLockIds } from '../src/cwd-lock.mjs';
+import { settledHubLockIds, hubViewTerminal } from '../src/cwd-lock.mjs';
 
 const lock = (jobId, mode = 'hub') => ({ cwd: '/repo', holder: { jobId, mode } });
 
@@ -55,4 +55,12 @@ test('an absent list (hub down) is the caller\'s decision, not something this he
   // The server must pass null/undefined only when it will not release at all;
   // this helper sees [] as a real, empty answer from the hub.
   assert.deepEqual(settledHubLockIds(undefined, [lock('hub-1')]), []);
+});
+
+test('a terminal hub view is not settled while disposal is still running', () => {
+  assert.equal(hubViewTerminal({ status: 'running' }), false);
+  assert.equal(hubViewTerminal({ status: 'needs_input', disposing: true }), false);
+  assert.equal(hubViewTerminal({ status: 'needs_input', disposing: false }), true);
+  assert.equal(hubViewTerminal({ status: 'done' }), true);
+  assert.equal(hubViewTerminal(undefined), false);
 });

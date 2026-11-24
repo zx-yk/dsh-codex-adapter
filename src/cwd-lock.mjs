@@ -92,6 +92,16 @@ export function getCwdLocks() {
 }
 
 /**
+ * A hub view is terminal only when its status has left `running` AND runtime
+ * disposal has finished. `needs_input` flips the status before the old runtime
+ * has stopped writing; treating that as settled lets a second writer into the
+ * workspace during the disposal window.
+ */
+export function hubViewTerminal(view) {
+  return Boolean(view) && view.status !== 'running' && view.disposing !== true;
+}
+
+/**
  * Job ids whose hub-held locks are provably stale, given one authoritative job
  * list from the hub. A lock is stale when its job is absent from that list or
  * is no longer running. Callers must only pass a list that actually arrived:
@@ -112,8 +122,7 @@ export function settledHubLockIds(remoteJobs, currentLocks) {
     // still starting, letting a second writer into the same workspace.
     if (typeof holder.jobId !== 'string' || holder.jobId === '') continue;
     const job = byId.get(holder.jobId);
-    if (job?.disposing) continue; // runtime still shutting down; not settled yet
-    if (job === undefined || job.status !== 'running') out.push(holder.jobId);
+    if (job === undefined || hubViewTerminal(job)) out.push(holder.jobId);
   }
   return out;
 }
