@@ -242,6 +242,7 @@ export async function startJob({ task, tier = 'flash', effort = 'max', cwd, maxT
 
     const sessionId = id;
     const onNotification = (n) => {
+      if (job.status !== 'running') return;
       // WPC14: the standalone runtime process exists once the run has started
       // (the SDK client spawns it lazily). Capture its pid on the first
       // notification so views, shard mirrors and ghost tombstones carry it —

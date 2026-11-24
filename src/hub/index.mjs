@@ -383,6 +383,9 @@ export class WorkerRegistry {
     this.jobs.set(id, job);
 
     const onEvent = (session, event) => {
+      // Late events from a disposed/cancelled session must not revive the live
+      // view (or refresh lastEventAt) after the job has settled.
+      if (job.status !== 'running') return;
       job.lastEventAt = new Date().toISOString();
       job.events.push(eventRecord(event, ++job.eventSeq));
       if (job.events.length > 200) job.events.splice(0, job.events.length - 200);

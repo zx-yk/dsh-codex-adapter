@@ -75,3 +75,10 @@ test('the ghost cap never evicts live rows', loadOpts, async () => {
   assert.ok(ghosts.g1);
   assert.ok(ghosts['live-0']);
 });
+
+test('a needs_input job holds the workspace lock only while disposing', loadOpts, async () => {
+  const { workspaceLocks } = await view();
+  const base = { id: 'j', cwd: '/repo', status: 'needs_input' };
+  assert.equal(workspaceLocks([{ ...base, disposing: true }]).length, 1);
+  assert.equal(workspaceLocks([{ ...base, disposing: false }]).length, 0);
+});

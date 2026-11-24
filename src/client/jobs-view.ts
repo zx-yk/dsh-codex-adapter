@@ -297,7 +297,8 @@ export function workspaceLocks(rows: any[]): Array<{ cwd: string; holder: any }>
       locks.push({ cwd: String(j.cwd), holder: j.holder });
       continue;
     }
-    if (j.status === 'running') {
+    if ((j.status === 'running' && j.disposing !== true)
+      || (j.status === 'needs_input' && j.disposing === true)) {
       const key = `job:${j.cwd}:${j.id ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);

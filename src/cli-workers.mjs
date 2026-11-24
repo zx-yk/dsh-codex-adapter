@@ -221,6 +221,9 @@ export function cliFallbackText(job) {
 }
 
 function touchActivity(job) {
+  // A dying CLI can keep writing after settle(); those bytes belong in
+  // _rawLines/stderr evidence, not in a fresh "active" liveness badge.
+  if (job.status !== 'running') return;
   const now = Date.now();
   job.activity.events += 1;
   job.activity.lastEventAt = new Date(now).toISOString();
