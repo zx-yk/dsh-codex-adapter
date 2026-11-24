@@ -4,6 +4,7 @@
 
 import { readGlobalConfig } from './install/install.mjs';
 import { pluginEnv } from './plugin-env.mjs';
+import { readHubToken } from './hub-token.mjs';
 
 /**
  * Resolved per call: DSH picks a fresh port on every launch and the hub URL is
@@ -27,7 +28,11 @@ function safeId(id) {
 export async function hubAvailable() {
   if (Date.now() - lastProbe.at < 10_000) return lastProbe.ok;
   try {
-    const res = await fetch(`${apiBase()}/ping`, { signal: AbortSignal.timeout(800) });
+    const token = readHubToken();
+    const res = await fetch(`${apiBase()}/ping`, {
+      signal: AbortSignal.timeout(800),
+      ...(token ? { headers: { 'x-dsh-adapter-token': token } } : {}),
+    });
     const body = await res.json();
     lastProbe = { at: Date.now(), ok: res.ok && body?.service === 'dsh-adapter-hub' };
   } catch {
@@ -37,7 +42,11 @@ export async function hubAvailable() {
 }
 
 async function call(path, init) {
-  const res = await fetch(`${apiBase()}${path}`, init);
+  const token = readHubToken();
+  const res = await fetch(`${apiBase()}${path}`, {
+    ...init,
+    ...(token ? { headers: { ...(init?.headers ?? {}), 'x-dsh-adapter-token': token } } : {}),
+  });
   const text = await res.text();
   let body;
   try { body = text === '' ? {} : JSON.parse(text); }

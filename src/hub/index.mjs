@@ -704,6 +704,9 @@ function hasBrowserMarkers(req) {
  *
  * @returns undefined when the request may proceed, otherwise 401 or 403.
  */
+let hubToken = '';
+export function setHubToken(token) { hubToken = String(token ?? ''); }
+
 export function requestRejectionFor(ctx, req) {
   let connection;
   try {
@@ -722,7 +725,11 @@ export function requestRejectionFor(ctx, req) {
     rejection = 403;
   }
   if (rejection === undefined) return undefined;
-  if (rejection === 401 && isLoopbackRequest(req) && !hasBrowserMarkers(req)) return undefined;
+  if (rejection === 401 && isLoopbackRequest(req) && !hasBrowserMarkers(req)) {
+    // With a token configured (normal runtime), require the MCP child to
+    // prove it read our 0600 token. Empty token keeps old/test callers usable.
+    if (!hubToken || String(req?.headers?.['x-dsh-adapter-token'] ?? '') === hubToken) return undefined;
+  }
   return rejection;
 }
 function sendJson(res, status, value, headers = {}) {
@@ -785,6 +792,8 @@ async function readBody(req, limit = 64 * 1024) {
 
 export async function apply(ctx) {
   seedLangFromHost(ctx);
+  const { ensureHubToken } = await import('./hub-token.mjs');
+  setHubToken(ensureHubToken());
   // Sandboxed commands need a temp root this user can grant on; fix that
   // before any worker session exists (see sandbox-temp.mjs).
   const sandboxTemp = prepareSandboxTemp();
