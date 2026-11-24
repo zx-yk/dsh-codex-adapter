@@ -1,6 +1,6 @@
 {
   "name": "dsh-adapter",
-  "version": "0.1.38",
+  "version": "0.1.39",
   "description": "Dispatch subtasks to DeepSeek Harness (DSH) agents as native subagents with live progress",
   "author": {
     "name": "zx-yk"
