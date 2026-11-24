@@ -14,12 +14,18 @@ const PLUGIN_KEY = `dsh-adapter@${MARKETPLACE_NAME}`;
 const MCP_TOOLS = ['dsh_run_worker', 'dsh_spawn_worker', 'dsh_worker_status', 'dsh_worker_result', 'dsh_worker_watch', 'dsh_worker_cancel', 'dsh_worker_config', 'dsh_worker_probe'];
 
 function backup(file) {
-  if (existsSync(file)) {
-    const bak = `${file}.dsh-adapter-backup-${Date.now()}`;
+  if (!existsSync(file)) return null;
+  // One rolling backup per file. Timestamped backups accumulated on every
+  // no-op install and made extra copies of credential-bearing configs.
+  const bak = `${file}.dsh-adapter-backup`;
+  try {
+    const current = readFileSync(file);
+    if (existsSync(bak) && readFileSync(bak).equals(current)) return null;
     copyFileSync(file, bak);
     return bak;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 function readJson(file, fallback, strict = false) {
@@ -290,17 +296,18 @@ export function installStatus({ home = homedir() } = {}) {
   };
 }
 
-export function uninstallCodex({ home = homedir() } = {}) {
+export function uninstallCodex({ home = homedir(), scope } = {}) {
   const actions = [];
+  const codexBase = scope === 'project' ? join(process.cwd(), '.codex') : codexDir(home);
   for (const f of ['ds-flash.toml', 'ds-pro.toml']) {
-    const p = join(codexDir(home), 'agents', f);
+    const p = join(codexBase, 'agents', f);
     if (existsSync(p)) { backup(p); rmSync(p); actions.push(`removed: ${p} (backup kept)`); }
   }
   for (const f of ['dsh-config.md', 'dsh-status.md', 'dsh-playbook.md']) {
-    const p = join(codexDir(home), 'prompts', f);
+    const p = join(codexBase, 'prompts', f);
     if (existsSync(p)) { rmSync(p); actions.push(`removed: ${p}`); }
   }
-  const configFile = join(codexDir(home), 'config.toml');
+  const configFile = join(codexBase, 'config.toml');
   if (existsSync(configFile)) {
     const before = readFileSync(configFile, 'utf8');
     if (hasTomlTable(before, 'mcp_servers.dsh-adapter')) {
@@ -385,6 +392,7 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
     actions.push('cli: skipped (non-default home; test mode)');
     return { ok: true, actions };
   }
+  let cliFailed = false;
   try {
     const { execSync } = await import('node:child_process');
     const run = (cmd) => execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });
@@ -396,7 +404,7 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
       // `plugin install` error that follows.
       const msg = String(err?.stdout ?? '') + String(err?.stderr ?? '') + String(err?.message ?? err);
       if (/already/i.test(msg)) actions.push('cli: marketplace add skipped (already registered)');
-      else actions.push(`cli: marketplace add failed — ${msg.replace(/\s+/g, ' ').trim().slice(0, 160)}`);
+      else { cliFailed = true; actions.push(`cli: marketplace add failed — ${msg.replace(/\s+/g, ' ').trim().slice(0, 160)}`); }
     }
     // `plugin install` on an already-installed plugin is a no-op and leaves a
     // stale snapshot in ~/.claude/plugins/cache — uninstall first so an update
@@ -405,9 +413,10 @@ export async function installClaudeCode({ home = homedir(), statusline = false }
     run(`claude plugin install ${PLUGIN_KEY} --scope user -y`);
     actions.push(`cli: plugin snapshot refreshed (${PLUGIN_KEY})`);
   } catch (err) {
+    cliFailed = true;
     actions.push(`cli: plugin install failed — run manually: claude plugin install ${PLUGIN_KEY} -y (${String(err?.message ?? err).slice(0, 120)})`);
   }
-  return { ok: true, actions };
+  return { ok: !cliFailed, actions };
 }
 
 
@@ -557,7 +566,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
   // The desktop client has no subagent spawn UI; a global MCP entry lets any
   // session call dsh_run_worker directly. Agent roles above stay for the CLI.
   try {
-    const configFile = join(codexDir(home), 'config.toml');
+    const configFile = scope === 'project' ? join(process.cwd(), '.codex', 'config.toml') : join(codexDir(home), 'config.toml');
     mkdirSync(dirname(configFile), { recursive: true });
     const before = existsSync(configFile) ? readFileSync(configFile, 'utf8') : '';
     if (!globalMcp) {
