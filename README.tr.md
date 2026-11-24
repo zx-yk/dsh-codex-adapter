@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Geçerli eklenti sürümü: <code>0.1.42</code> &middot; DSH <code>0.1.1-rc.1</code> ile test edildi</sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Geçerli eklenti sürümü: <code>0.1.43</code> &middot; DSH <code>0.1.1-rc.1</code> ile test edildi</sub>
 </p>
 
 <p align="center">

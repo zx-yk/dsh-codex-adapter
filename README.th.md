@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; เวอร์ชันปลั๊กอินปัจจุบัน: <code>0.1.42</code> &middot; ทดสอบกับ DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; เวอร์ชันปลั๊กอินปัจจุบัน: <code>0.1.43</code> &middot; ทดสอบกับ DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
