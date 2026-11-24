@@ -358,13 +358,23 @@ function CustomSelect({ value, options, onChange, minWidth }: {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     const t = setTimeout(() => document.addEventListener('mousedown', close), 0);
     document.addEventListener('keydown', onKey);
-    return () => { clearTimeout(t); document.removeEventListener('mousedown', close); document.removeEventListener('keydown', onKey); };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
   }, [open]);
   const current = options.find((o) => o.value === value);
   return (<>
     <button type="button"
       style={{ ...S.input, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minWidth: minWidth ?? 92, width: '100%', boxSizing: 'border-box' as const, justifyContent: 'space-between' }}
+      onMouseDown={(e: any) => e.stopPropagation()}
       onClick={(e: any) => {
+        if (open) { setOpen(null); return; }
         const r = e.currentTarget.getBoundingClientRect();
         const up = window.innerHeight - r.bottom < 240;
         setOpen({ left: r.left, top: r.bottom + 4, bottom: window.innerHeight - r.top + 4, width: Math.max(r.width, 130), up });

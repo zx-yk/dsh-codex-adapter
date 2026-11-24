@@ -963,7 +963,11 @@ export async function apply(ctx) {
         if (rejection !== undefined) return sendJson(res, rejection, { ok: false, error: rejection === 401 ? 'authentication required' : 'forbidden' });
         try {
           const url = new URL(req.url, 'http://localhost');
-          const parts = url.pathname.slice(`${ROUTE_BASE}/jobs`.length).split('/').filter(Boolean);
+          const suffix = url.pathname.slice(`${ROUTE_BASE}/jobs`.length);
+          // The slots API matches this route by prefix; without a boundary,
+          // /jobsAnything would be treated as job id "Anything".
+          if (suffix !== '' && !suffix.startsWith('/')) return sendJson(res, 404, { ok: false, error: 'not found' });
+          const parts = suffix.split('/').filter(Boolean);
           if (req.method === 'GET' && parts.length === 0) {
             // Machine-wide view: this hub's live jobs plus fresh shards from
             // other writers (standalone MCP sessions, other hub instances).
@@ -975,7 +979,13 @@ export async function apply(ctx) {
             const wait = parseWaitSeconds(url.searchParams.get('wait'));
             if (wait === null) return sendJson(res, 400, { ok: false, error: 'wait must be a non-negative integer number of seconds' });
             const job = await hub.wait(parts[0], Math.min(wait, 600) * 1000);
-            if (!job) return sendJson(res, 404, { ok: false, error: 'no such job' });
+            if (!job) {
+              // A job listed from another writer's shard has no local handle
+              // to wait on, but its current snapshot is still readable.
+              const foreign = readMergedStatus({ excludeWriter: hub.shard.writer }).find((j) => j.id === parts[0]);
+              if (foreign) return sendJson(res, 200, { ok: true, job: foreign, foreign: true });
+              return sendJson(res, 404, { ok: false, error: 'no such job' });
+            }
             return sendJson(res, 200, { ok: true, job: hub.view(job, true) });
           }
           if (req.method === 'POST' && parts.length === 0) {

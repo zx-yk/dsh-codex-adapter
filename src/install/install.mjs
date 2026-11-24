@@ -58,6 +58,10 @@ function tomlTableName(line) {
   return m ? m[1].trim() : null;
 }
 
+function hasTomlTable(toml, header) {
+  return String(toml).split(/\r?\n/).some((line) => tomlTableName(line) === header);
+}
+
 function removeTomlSection(toml, header) {
   const lines = toml.split('\n');
   const start = lines.findIndex((l) => tomlTableName(l) === header);
@@ -275,7 +279,7 @@ export function installStatus({ home = homedir() } = {}) {
   const agyInstalled = !!(agyMcp.mcpServers && agyMcp.mcpServers['dsh-adapter'])
     || existsSync(join(home, '.gemini', 'config', 'agents', 'ds-flash.md'));
   const grokTxt = readText(join(home, '.grok', 'config.toml'));
-  const grokInstalled = grokTxt.includes('[mcp_servers.dsh-adapter]')
+  const grokInstalled = hasTomlTable(grokTxt, 'mcp_servers.dsh-adapter')
     || existsSync(join(home, '.grok', 'agents', 'ds-flash.md'));
   const detected = detectHosts(home);
   return {
@@ -299,7 +303,7 @@ export function uninstallCodex({ home = homedir() } = {}) {
   const configFile = join(codexDir(home), 'config.toml');
   if (existsSync(configFile)) {
     const before = readFileSync(configFile, 'utf8');
-    if (before.includes('[mcp_servers.dsh-adapter]')) {
+    if (hasTomlTable(before, 'mcp_servers.dsh-adapter')) {
       backup(configFile);
       writeFileSync(configFile, removeCodexMcp(before));
       actions.push('mcp: removed dsh-adapter from config.toml (backup kept)');
@@ -557,7 +561,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
     mkdirSync(dirname(configFile), { recursive: true });
     const before = existsSync(configFile) ? readFileSync(configFile, 'utf8') : '';
     if (!globalMcp) {
-      if (before.includes('[mcp_servers.dsh-adapter]')) {
+      if (hasTomlTable(before, 'mcp_servers.dsh-adapter')) {
         const bak = backup(configFile);
         if (bak) actions.push(`backup: ${bak}`);
         writeFileSync(configFile, removeCodexMcp(before));
