@@ -50,7 +50,8 @@ function modeOf(j) { return j.mode ?? (j.backend ? 'cli' : 'standalone'); }
 
 /** Bounded task preview with a visible truncation marker (PATTERN-AUDIT D3). */
 function clipTask(task, cap = 300) {
-  return task.length > cap ? task.slice(0, cap) + '…' : task;
+  const text = String(task ?? '');
+  return text.length > cap ? text.slice(0, cap) + '…' : text;
 }
 
 export function publishStatus() {

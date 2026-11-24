@@ -153,12 +153,24 @@ export function readGlobalConfig() {
   return { ...GLOBAL_CONFIG_DEFAULTS, ...readJson(GLOBAL_CONFIG_FILE, {}) };
 }
 
+/**
+ * Apply a settings patch without letting inherited Object.prototype names
+ * through. `'__proto__' in GLOBAL_CONFIG_DEFAULTS` is true even though the
+ * defaults never declare it; the old `in` check then assigned
+ * `next['__proto__'] = value`, mutating the result's prototype and dropping
+ * the value from the written JSON. Only own defaults are valid keys.
+ */
+export function applyGlobalConfigPatch(current, patch) {
+  const next = { ...current };
+  for (const [k, v] of Object.entries(patch ?? {})) {
+    if (v !== undefined && Object.hasOwn(GLOBAL_CONFIG_DEFAULTS, k)) next[k] = v;
+  }
+  return next;
+}
+
 export function writeGlobalConfig(patch) {
   mkdirSync(CONFIG_DIR_HOME(), { recursive: true });
-  const next = { ...readGlobalConfig() };
-  for (const [k, v] of Object.entries(patch ?? {})) {
-    if (v !== undefined && k in GLOBAL_CONFIG_DEFAULTS) next[k] = v;
-  }
+  const next = applyGlobalConfigPatch(readGlobalConfig(), patch);
   writeFileSync(GLOBAL_CONFIG_FILE, JSON.stringify(next, null, 2) + '\n');
   return next;
 }

@@ -129,8 +129,9 @@ const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 
 /** Bounded task preview with a visible truncation marker (PATTERN-AUDIT D3:
 // a silently truncated task reads like the whole brief in status views). */
-function clipTask(task, cap = 300) {
-  return task.length > cap ? task.slice(0, cap) + '…' : task;
+export function clipTask(task, cap = 300) {
+  const text = String(task ?? '');
+  return text.length > cap ? text.slice(0, cap) + '…' : text;
 }
 
 export class WorkerRegistry {
@@ -304,6 +305,9 @@ export class WorkerRegistry {
   }
 
   async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset, timeout_seconds }) {
+    if (typeof task !== 'string' || task.trim() === '') {
+      throw new Error('task must be a non-empty string');
+    }
     if (!TIERS.includes(tier)) throw new Error(`unknown tier "${tier}"`);
     // An explicit {provider, model} from the caller wins (the MCP process owns
     // session-level overrides, exactly as it does for presets); otherwise the
@@ -882,7 +886,11 @@ export async function apply(ctx) {
           }
           if (req.method === 'GET' && parts.length === 2 && parts[1] === 'events') {
             const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
-            const wait = parseWaitSeconds(url.searchParams.get('wait')) ?? 0;
+            const wait = parseWaitSeconds(url.searchParams.get('wait'));
+            // A garbage `wait` must be an error, never a silent no-wait: the
+            // sibling /jobs/:id route already rejects it, and `?? 0` here made
+            // `?wait=abc` look like a successful immediate poll.
+            if (wait === null) return sendJson(res, 400, { ok: false, error: 'wait must be a non-negative integer number of seconds' });
             const deadline = Date.now() + Math.min(wait, 300) * 1000;
             for (;;) {
               const live = hub.jobs.get(parts[0]);
