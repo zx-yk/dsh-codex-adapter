@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; वर्तमान प्लगइन रिलीज: <code>0.1.0-rc.11</code> &middot; DSH <code>0.1.1-rc.1</code> के साथ परीक्षित</sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; वर्तमान प्लगइन रिलीज: <code>0.1.42</code> &middot; DSH <code>0.1.1-rc.1</code> के साथ परीक्षित</sub>
 </p>
 
 <p align="center">

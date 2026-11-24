@@ -123,10 +123,11 @@ try {
   check('done → green', sDone.color === '#3fb950' && sDone.label === '完成');
 
   // 9. Ghost registry is capped.
-  let gc = {};
-  const many = Array.from({ length: GHOST_CAP + 5 }, (_, i) => job({ id: `job-${i}-y` }));
-  gc = reconcileGhosts(many, gc, now);
-  check('ghost registry stays capped', Object.keys(gc).length <= GHOST_CAP);
+  const ghostSeed = Object.fromEntries(Array.from({ length: GHOST_CAP + 5 }, (_, i) => [
+    `job-${i}-y`, { job: job({ id: `job-${i}-y` }), lastSeenAt: now, misses: 0 },
+  ]));
+  const gc = reconcileGhosts([], ghostSeed, now);
+  check('ghost registry caps only orphaned ghosts, never live rows', Object.keys(gc).length <= GHOST_CAP);
   // 10. WPC13 workspace grouping: multi-cwd groups, no-cwd bucket, ordering.
   const gj = groupJobs([
     job({ cwd: '/w/z' }), job({ cwd: '/w/a' }),

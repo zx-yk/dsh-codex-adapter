@@ -792,7 +792,7 @@ async function readBody(req, limit = 64 * 1024) {
 
 export async function apply(ctx) {
   seedLangFromHost(ctx);
-  const { ensureHubToken } = await import('./hub-token.mjs');
+  const { ensureHubToken } = await import('../hub-token.mjs');
   setHubToken(ensureHubToken());
   // Sandboxed commands need a temp root this user can grant on; fix that
   // before any worker session exists (see sandbox-temp.mjs).
@@ -971,10 +971,18 @@ export async function apply(ctx) {
           adoptLang(body?.lang);
           const pid = parsePid(body?.pid);
           if (pid === null) return sendJson(res, 400, { ok: false, error: 'pid must be a positive integer' });
+          const jobId = typeof body?.job_id === 'string' ? body.job_id : '';
+          if (!jobId) return sendJson(res, 400, { ok: false, error: 'job_id is required for a verified kill' });
           let pgid = null;
           if (body.pgid !== undefined && body.pgid !== null) {
             pgid = parsePid(body.pgid);
             if (pgid === null) return sendJson(res, 400, { ok: false, error: 'pgid must be a positive integer' });
+          }
+          const known = hub.jobs.get(jobId) ?? readMergedStatus({ excludeWriter: hub.shard.writer }).find((j) => j.id === jobId);
+          if (!known) return sendJson(res, 404, { ok: false, error: 'no such job' });
+          if (known.status === 'running' || known.status === 'needs_input') return sendJson(res, 409, { ok: false, error: 'refusing to kill a running job through the orphan endpoint' });
+          if (known.pid !== undefined && known.pid !== null && known.pid !== pid) {
+            return sendJson(res, 409, { ok: false, error: 'pid does not match the recorded job pid' });
           }
           const result = await killWorkerProcess({ pid, pgid });
           return sendJson(res, 200, { ok: true, ...result });

@@ -13,10 +13,10 @@
 //   - Keyed by the canonical absolute path of the cwd — realpath when the
 //     directory exists (symlink aliases like macOS's /tmp -> /private/tmp
 //     then share one lock), resolve() otherwise.
-//   - Process memory only, on purpose: no file locks, so a crashed dispatch
-//     process can never leave a permanent deadlock behind — its locks die
-//     with it. Locks therefore coordinate dispatches within one adapter MCP
-//     session (one per host session).
+//   - Canonical cwd -> an in-memory map plus a per-cwd JSON file under
+//     ~/.config/dsh-adapter/cwd-locks. The file lets separate MCP sessions
+//     coordinate; a lock whose pid is dead is removed on the next acquire.
+//     A crashed dispatcher therefore cannot deadlock the workspace forever.
 //   - Advisory: allow_concurrent_cwd: true skips acquisition entirely
 //     (read-only fan-out over one repo is legitimate).
 //   - Released on every terminal path (done / failed / cancelled / timeout)
@@ -25,10 +25,52 @@
 //     client, so their locks are released when a settled state is observed
 //     (hub.get after wait, dsh_worker_status purge, stale-check on acquire).
 
-import { resolve } from 'node:path';
-import { realpathSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { realpathSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync, openSync, closeSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 
 const locks = new Map(); // canonical cwd -> holder
+const LOCK_DIR = process.env.DSH_ADAPTER_LOCK_DIR || join(homedir(), '.config', 'dsh-adapter', 'cwd-locks');
+
+function lockPath(key) {
+  return join(LOCK_DIR, createHash('sha1').update(key).digest('hex') + '.json');
+}
+function readLockFile(key) {
+  try { const raw = JSON.parse(readFileSync(lockPath(key), 'utf8')); return raw && typeof raw === 'object' ? raw : null; }
+  catch { return null; }
+}
+function pidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; } catch (err) { return err?.code === 'EPERM'; }
+}
+function staleHolder(key) {
+  const holder = readLockFile(key);
+  if (!holder || !pidAlive(Number(holder.pid))) { try { unlinkSync(lockPath(key)); } catch (e) { if (e?.code !== 'ENOENT') try { rmSync(lockPath(key), { force: true }); } catch {} } return true; }
+  return false;
+}
+function writeLockFile(key, holder) {
+  try { mkdirSync(LOCK_DIR, { recursive: true }); writeFileSync(lockPath(key), JSON.stringify({ ...holder, pid: process.pid })); } catch { /* disk lock best-effort */ }
+}
+function acquireDiskLock(key, holder) {
+  mkdirSync(LOCK_DIR, { recursive: true });
+  for (;;) {
+    try {
+      const fd = openSync(lockPath(key), 'wx');
+      // Write the payload through the same exclusive descriptor: opening then
+      // closing empty lets a concurrent process mistake our half-created lock
+      // for a stale one and remove it.
+      writeFileSync(fd, JSON.stringify({ ...holder, pid: process.pid }));
+      closeSync(fd);
+      return;
+    } catch (err) {
+      if (err?.code !== 'EEXIST') return; // no disk lock available; memory remains
+      if (staleHolder(key)) continue;
+      const existing = readLockFile(key) ?? { cwd: key, jobId: null, backend: 'unknown', mode: 'unknown', startedAt: null };
+      throw new CwdLockError(existing);
+    }
+  }
+}
 
 /** Canonical absolute path of a workspace cwd (realpath when it exists). */
 export function normalizeCwd(cwd) {
@@ -59,7 +101,8 @@ export function acquireCwdLock({ cwd, jobId, backend, mode, startedAt, allowConc
   const key = normalizeCwd(cwd);
   const existing = locks.get(key);
   if (existing) throw new CwdLockError(existing);
-  const holder = { jobId, backend, mode, startedAt, cwd: key };
+  const holder = { jobId, backend, mode, startedAt, cwd: key, pid: process.pid };
+  acquireDiskLock(key, holder);
   locks.set(key, holder);
   let released = false;
   return {
@@ -68,27 +111,51 @@ export function acquireCwdLock({ cwd, jobId, backend, mode, startedAt, allowConc
       if (released) return;
       released = true;
       if (locks.get(key) === holder) locks.delete(key);
+      try {
+        const current = readLockFile(key);
+        if (!current || current.pid === holder.pid && current.jobId === holder.jobId) { try { unlinkSync(lockPath(key)); } catch (e) { if (e?.code !== 'ENOENT') try { rmSync(lockPath(key), { force: true }); } catch {} } }
+      } catch {}
     },
   };
 }
 
 /** Backfill the real job id after a spawn whose id was unknown at acquire time (hub path). */
 export function updateCwdLockHolder({ cwd, jobId }) {
-  const holder = locks.get(normalizeCwd(cwd));
-  if (holder) holder.jobId = jobId;
+  const key = normalizeCwd(cwd);
+  const holder = locks.get(key);
+  if (holder) { holder.jobId = jobId; writeLockFile(key, holder); }
 }
 
 /** Release whichever lock the given job holds (idempotent). */
 export function releaseCwdLockByJobId(jobId) {
+  let found = false;
   for (const [key, holder] of locks) {
-    if (holder.jobId === jobId) { locks.delete(key); return true; }
+    if (holder.jobId === jobId) { locks.delete(key); found = true; }
   }
-  return false;
+  try {
+    for (const name of readdirSync(LOCK_DIR)) {
+      if (!name.endsWith('.json')) continue;
+      while (true) { const raw = JSON.parse(readFileSync(join(LOCK_DIR, name), 'utf8')); if (raw?.jobId === jobId) { try { unlinkSync(join(LOCK_DIR, name)); } catch (e) { if (e?.code !== 'ENOENT') try { rmSync(join(LOCK_DIR, name), { force: true }); } catch {} } found = true; } break; }
+    }
+  } catch {}
+  return found;
 }
 
 /** Current lock table for dsh_worker_status: which cwd is held by whom. */
 export function getCwdLocks() {
-  return [...locks.entries()].map(([cwd, holder]) => ({ cwd, holder: { ...holder } }));
+  const out = [...locks.entries()].map(([cwd, holder]) => ({ cwd, holder: { ...holder } }));
+  try {
+    const seen = new Set(out.map((e) => e.cwd));
+    for (const name of readdirSync(LOCK_DIR)) {
+      if (!name.endsWith('.json')) continue;
+      try {
+        const holder = JSON.parse(readFileSync(join(LOCK_DIR, name), 'utf8'));
+        if (!holder?.cwd || seen.has(holder.cwd) || !pidAlive(Number(holder.pid))) continue;
+        seen.add(holder.cwd); out.push({ cwd: holder.cwd, holder: { ...holder } });
+      } catch {}
+    }
+  } catch {}
+  return out;
 }
 
 /**

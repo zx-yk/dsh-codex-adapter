@@ -29,7 +29,8 @@
     "prepack": "npm run build && npm run smoke:cwd && npm run smoke:mcp",
     "prepublishOnly": "npm test && npm run smoke:mcp && npm run smoke:pack",
     "test": "node --test tests/*.test.mjs",
-    "caps:sync": "node scripts/sync-model-caps.mjs"
+    "caps:sync": "node scripts/sync-model-caps.mjs",
+    "verify": "node scripts/verify-wpc10-client.mjs && node scripts/verify-wpc14-proc-endpoints.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",

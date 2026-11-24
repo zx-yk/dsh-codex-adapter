@@ -631,7 +631,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       const res = await fetch(withLang('/proc-kill'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ pid: p.pid, ...(p.pgid === null ? {} : { pgid: p.pgid }), lang: locale === 'zh' ? 'zh' : 'en' }),
+        body: JSON.stringify({ job_id: id, pid: p.pid, ...(p.pgid === null ? {} : { pgid: p.pgid }), lang: locale === 'zh' ? 'zh' : 'en' }),
       });
       const body = await res.json().catch(() => null);
       if (res.ok && body?.ok !== false && typeof body?.signal === 'string') {
