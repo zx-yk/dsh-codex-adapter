@@ -162,8 +162,22 @@ export function readGlobalConfig() {
  */
 export function applyGlobalConfigPatch(current, patch) {
   const next = { ...current };
+  const numeric = {
+    default_timeout_seconds: [1, 7200],
+    stall_timeout_seconds: [1, 86_400],
+    caps_ttl_seconds: [1, 86_400],
+  };
   for (const [k, v] of Object.entries(patch ?? {})) {
-    if (v !== undefined && Object.hasOwn(GLOBAL_CONFIG_DEFAULTS, k)) next[k] = v;
+    if (v === undefined || !Object.hasOwn(GLOBAL_CONFIG_DEFAULTS, k)) continue;
+    if (numeric[k]) {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < numeric[k][0] || n > numeric[k][1]) {
+        throw new Error(`${k} must be an integer in ${numeric[k][0]}..${numeric[k][1]}`);
+      }
+      next[k] = n;
+      continue;
+    }
+    next[k] = v;
   }
   return next;
 }

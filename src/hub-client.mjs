@@ -64,7 +64,7 @@ export const hub = {
   providers: () => call('/providers').then((b) => ({
     providers: b.providers ?? [],
     bindings: b.bindings ?? null,
-  })).catch(() => ({ providers: [], bindings: null })),
+  })).catch(() => ({ providers: null, bindings: null, unavailable: true })),
   // `waitSeconds = 0` keeps the plain "read it now" semantics; anything longer
   // is served by repeated short waits until the job settles or the budget ends.
   get: async (id, waitSeconds = 0) => {

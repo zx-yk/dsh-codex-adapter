@@ -437,6 +437,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   const [hoverTask, setHoverTask] = useState<{ id: string; text: string; right: number; top: number; bottom: number; flip: boolean } | null>(null);
   const [status, setStatus] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
+  const [loadError, setLoadError] = useState('');
   const [dynModels, setDynModels] = useState<Record<string, Array<{ value: string; label?: string }>>>({});
   const [presetRoster, setPresetRoster] = useState<{ defaultId?: string; presets: Array<{ id: string; name?: string; trust?: string }> }>({ presets: [] });
   // Labels are built at render, not at fetch, so they follow a locale switch.
@@ -606,7 +607,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         }
       }
       if (pr.ok) setPresetRoster({ defaultId: pr.defaultId, presets: pr.presets ?? [] });
-    } catch { /* instance restarting */ }
+      setLoadError('');
+    } catch (e: any) { setLoadError(String(e?.message ?? e)); }
   }, [get, post, mergeJobs]);
 
   useEffect(() => {
@@ -618,19 +620,19 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     return () => clearInterval(timer);
   }, [refreshAll, get, mergeJobs]);
 
-  const act = useCallback(async (target: string, confirmName?: string) => {
+  const act = useCallback(async (target: string, confirmName?: string, noteKey = target) => {
     if (confirmName && !window.confirm(copy.confirmRestore(confirmName))) return;
     setBusy(true); setNotice(copy.working);
-    setRowNote((m) => ({ ...m, [target]: { kind: 'working', text: copy.working } }));
+    setRowNote((m) => ({ ...m, [noteKey]: { kind: 'working', text: copy.working } }));
     try {
       const r = await post('/install', { target });
       if (r.ok === false) throw new Error(r.error);
       setNotice((r.actions ?? []).join('；'));
-      setRowNote((m) => ({ ...m, [target]: { kind: 'ok', text: copy.doneAt(new Date().toLocaleTimeString()) } }));
+      setRowNote((m) => ({ ...m, [noteKey]: { kind: 'ok', text: copy.doneAt(new Date().toLocaleTimeString()) } }));
       const s = await get('/install/status'); if (s.ok) setStatus(s.status);
     } catch (e: any) {
       setNotice(String(e?.message ?? e));
-      setRowNote((m) => ({ ...m, [target]: { kind: 'error', text: String(e?.message ?? e) } }));
+      setRowNote((m) => ({ ...m, [noteKey]: { kind: 'error', text: String(e?.message ?? e) } }));
     } finally { setBusy(false); }
   }, [post, get, copy]);
 
@@ -725,6 +727,10 @@ function WorkersPanel({ ctx }: { ctx: any }) {
 
   // --- custom providers & user-added models -------------------------------
   const customProviders: any[] = config?.custom_providers ?? [];
+  // Entries derived from DSH providers are read-only in this panel: deleting
+  // one is undone by the next /config merge, and editing would drop its
+  // api_key_env reference and persist a stale copy into config.json.
+  const userProviders = customProviders.filter((p) => !p.auto);
   const extraModels: Record<string, string[]> = config?.extra_models ?? {};
   const RESERVED_IDS = ['claude-code', 'codex', 'grok', 'agy', 'off', 'custom', 'default'];
   const provType = (p: any): 'api' | 'cli' => p.type ?? ((p.vision_command || p.imagegen_command) ? 'cli' : 'api');
@@ -798,8 +804,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
       }
       : { id, name, type: 'cli', models, vision_command, imagegen_command };
     const next = provForm.originalId
-      ? customProviders.map((p) => (p.id === provForm.originalId ? entry : p))
-      : [...customProviders, entry];
+      ? userProviders.map((p) => (p.id === provForm.originalId ? entry : p))
+      : [...userProviders, entry];
     field('custom_providers', next);
     setProvForm(null);
   };
@@ -831,7 +837,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
   };
   const deleteProvider = (id: string) => {
     if (!config) return;
-    const patch: any = { custom_providers: customProviders.filter((p) => p.id !== id) };
+    const patch: any = { custom_providers: userProviders.filter((p) => p.id !== id) };
     if (config.vision_provider === id) { patch.vision_provider = 'claude-code'; patch.vision_model = 'haiku'; }
     if (config.imagegen_provider === id) patch.imagegen_provider = 'codex';
     setConfig((c: any) => ({ ...c, ...patch }));
@@ -849,11 +855,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     </div>
   );
 
-  const integrationRow = (name: string, installed: boolean, detected: boolean, extra: any, installTarget: string, uninstallTarget: string, tips: any) => {
+  const integrationRow = (name: string, installed: boolean | null, detected: boolean | null, extra: any, installTarget: string, uninstallTarget: string, tips: any) => {
+    const unknown = installed === null || detected === null;
     // `installed` means our integration files are present; `detected` means
     // the host software itself is installed. They are independent: a fresh
     // Codex install has no ds-flash.toml yet and must still read "detected".
-    const dotColor = installed ? '#3fb950' : detected ? '#d29922' : 'rgba(128,128,128,0.45)';
+    const dotColor = unknown ? 'rgba(128,128,128,0.45)' : installed ? '#3fb950' : detected ? '#d29922' : 'rgba(128,128,128,0.45)';
     const chipStyle = installed
       ? S.chip(true)
       : detected
@@ -872,14 +879,14 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         {name}
       </span>
       <span style={chipStyle} title={installed ? copy.installed : detected ? copy.hostDetected : copy.hostMissing}>
-        {installed ? `● ${copy.installed}` : detected ? `● ${copy.hostDetected}` : `○ ${copy.hostMissing}`}
+        {unknown ? `… ${copy.loading}` : installed ? `● ${copy.installed}` : detected ? `● ${copy.hostDetected}` : `○ ${copy.hostMissing}`}
       </span>
       {!installed && detected && <span style={S.chip(false)}>{copy.notIntegrated}</span>}
       {extra}
       <span style={{ flex: 1 }} />
-      {!installed && <button style={S.btn} title={tips.install} disabled={busy} onClick={() => { void act(installTarget); }}>{copy.install}</button>}
-      {installed && <button style={S.btn} title={tips.update} disabled={busy} onClick={() => { void act(installTarget); }}>{rowNote[installTarget]?.kind === 'working' ? copy.working : copy.update}</button>}
-      {installed && <button style={{ ...S.btn, opacity: 0.75 }} title={tips.restore} disabled={busy} onClick={() => { void act(uninstallTarget, name); }}>{copy.restore}</button>}
+      {!unknown && !installed && <button style={S.btn} title={tips.install} disabled={busy} onClick={() => { void act(installTarget); }}>{copy.install}</button>}
+      {!unknown && installed && <button style={S.btn} title={tips.update} disabled={busy} onClick={() => { void act(installTarget); }}>{rowNote[installTarget]?.kind === 'working' ? copy.working : copy.update}</button>}
+      {installed && <button style={{ ...S.btn, opacity: 0.75 }} title={tips.restore} disabled={busy} onClick={() => { void act(uninstallTarget, name, installTarget); }}>{copy.restore}</button>}
       {rowNote[installTarget] && (
         <span style={{
           fontSize: 11.5, maxWidth: 260, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', overflowWrap: 'anywhere',
@@ -1080,14 +1087,21 @@ function WorkersPanel({ ctx }: { ctx: any }) {
         })}
       </div>
 
+      {loadError !== '' && (
+        <div style={{ padding: 10, border: '1px solid rgba(248,81,73,0.35)', borderRadius: 8, fontSize: 12, color: '#f85149' }}>
+          {loadError}
+          <button type="button" style={{ ...S.btn, marginLeft: 8, padding: '2px 8px' }} onClick={() => { setLoadError(''); void refreshAll(); }}>{copy.historyRefresh}</button>
+        </div>
+      )}
+
       {tab === 'integrations' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {integrationRow('Claude Code', !!status?.claude?.installed, !!status?.claude?.detected,
+          {integrationRow('Claude Code', status ? !!status.claude?.installed : null, status ? !!status.claude?.detected : null,
             status?.claude?.installed ? <span style={S.chip(!!status?.claude?.hud)}>{copy.hud}</span> : null,
             'claude', 'claude-uninstall', (copy as any).tips.claude)}
-          {integrationRow('Codex', !!status?.codex?.installed, !!status?.codex?.detected, null, 'codex', 'codex-uninstall', (copy as any).tips.codex)}
-          {integrationRow('Antigravity', !!status?.agy?.installed, !!status?.agy?.detected, null, 'agy', 'agy-uninstall', (copy as any).tips.agy)}
-          {integrationRow('Grok', !!status?.grok?.installed, !!status?.grok?.detected, null, 'grok', 'grok-uninstall', (copy as any).tips.grok)}
+          {integrationRow('Codex', status ? !!status.codex?.installed : null, status ? !!status.codex?.detected : null, null, 'codex', 'codex-uninstall', (copy as any).tips.codex)}
+          {integrationRow('Antigravity', status ? !!status.agy?.installed : null, status ? !!status.agy?.detected : null, null, 'agy', 'agy-uninstall', (copy as any).tips.agy)}
+          {integrationRow('Grok', status ? !!status.grok?.installed : null, status ? !!status.grok?.detected : null, null, 'grok', 'grok-uninstall', (copy as any).tips.grok)}
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, paddingLeft: 2, opacity: config ? 1 : 0.5 }}
             title={copy.globalMcpHint}>
             <input type="checkbox" checked={config?.codex_global_mcp !== false} disabled={busy || !config}
@@ -1134,7 +1148,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
           <label style={S.field}><span style={S.fieldLabel}>{copy.timeout}</span>
             <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} type="number" min={60} max={7200} value={config.default_timeout_seconds}
               onChange={(e) => fieldLocal('default_timeout_seconds', Number(e.target.value))}
-              onBlur={() => applyPatch({ default_timeout_seconds: config.default_timeout_seconds })} /></label>
+              onBlur={() => {
+                const n = Number(config.default_timeout_seconds);
+                const safe = !Number.isFinite(n) || n < 60 ? 1800 : Math.min(7200, Math.round(n));
+                if (safe !== n) setConfig((c: any) => ({ ...c, default_timeout_seconds: safe }));
+                void applyPatch({ default_timeout_seconds: safe });
+              }} /></label>
           <label style={S.field}><span style={S.fieldLabel}>{copy.hubUrl}</span>
             <input style={{ ...S.input, width: '100%', boxSizing: 'border-box' as const }} value={config.hub_url}
               onChange={(e) => fieldLocal('hub_url', e.target.value)}
@@ -1211,20 +1230,21 @@ function WorkersPanel({ ctx }: { ctx: any }) {
               {canSee(p) && <span style={S.chip(true)}>{copy.capVision}</span>}
               {canDraw(p) && <span style={S.chip(true)}>{copy.capImagegen}</span>}
               {provType(p) === 'api' && !!p.api_key && <span style={{ fontSize: 11.5, opacity: 0.5 }}>key {copy.keySet}</span>}
+              {p.auto && <span style={S.chip(false)}>DSH</span>}
               <span style={{ flex: 1 }} />
               <button style={{ ...S.btn, padding: '2px 8px' }} title={copy.testTip}
                 disabled={!!testResult?.busy}
                 onClick={() => runProviderTest(`row:${p.id}`, p)}>
                 {testResult?.key === `row:${p.id}` && testResult.busy ? copy.testing : copy.testProvider}</button>
-              <button style={{ ...S.btn, padding: '2px 8px' }}
+              {!p.auto && <button style={{ ...S.btn, padding: '2px 8px' }}
                 onClick={() => setProvForm({
                   originalId: p.id, name: p.name ?? p.id, type: provType(p),
                   models: (p.models ?? []).join(', '),
                   base_url: p.base_url ?? '', api_key: p.api_key ?? '', imagegen_model: p.imagegen_model ?? '',
                   vision_command: p.vision_command ?? '', imagegen_command: p.imagegen_command ?? '',
-                })}>{copy.edit}</button>
-              <button style={{ ...S.btn, padding: '2px 8px', opacity: 0.75 }}
-                onClick={() => { if (confirm(copy.confirmDeleteProvider(p.name || p.id))) deleteProvider(p.id); }}>{copy.del}</button>
+                })}>{copy.edit}</button>}
+              {!p.auto && <button style={{ ...S.btn, padding: '2px 8px', opacity: 0.75 }}
+                onClick={() => { if (confirm(copy.confirmDeleteProvider(p.name || p.id))) deleteProvider(p.id); }}>{copy.del}</button>}
             </div>
           ))}
           {customProviders.some((p) => testResult?.key === `row:${p.id}`) && testReport(testResult!.key)}

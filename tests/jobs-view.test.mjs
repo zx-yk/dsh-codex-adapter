@@ -81,4 +81,5 @@ test('a needs_input job holds the workspace lock only while disposing', loadOpts
   const base = { id: 'j', cwd: '/repo', status: 'needs_input' };
   assert.equal(workspaceLocks([{ ...base, disposing: true }]).length, 1);
   assert.equal(workspaceLocks([{ ...base, disposing: false }]).length, 0);
+  assert.equal(workspaceLocks([{ id: 'f', cwd: '/repo', status: 'failed', disposing: true }]).length, 1);
 });

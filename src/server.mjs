@@ -32,6 +32,14 @@ const allowConcurrentCwdSchema = z.boolean().optional().describe('Allow this dis
 import { readGlobalConfig } from './install/install.mjs';
 import { describeBindings, resolveTierBinding } from './tier-binding.mjs';
 const globalDefaults = readGlobalConfig();
+// Only these keys belong to a session; keeping an allow-list prevents the
+// whole config file (including custom-provider API keys) from being copied
+// into sessionConfig and printed by dsh_worker_config.
+const SESSION_KEYS = [
+  'enabled', 'default_tier', 'default_effort', 'mode', 'default_timeout_seconds',
+  'tier_policy', 'escalate_on_failure', 'preset_flash', 'preset_pro',
+  'flash_provider', 'flash_model', 'pro_provider', 'pro_model', 'origin_depth_limit',
+];
 const sessionConfig = {
   enabled: true,
   default_tier: globalDefaults.default_tier,
@@ -267,7 +275,14 @@ server.registerTool('dsh_run_worker', {
       && firstTier === 'flash' && sessionConfig.tier_policy !== 'flash-only') {
     const firstError = job.error ?? job.stopReason ?? 'unknown failure';
     res = await runOnce('pro');
-    if (res.refusal) return res.refusal;
+    if (res.refusal) {
+      const refusal = res.refusal?.content?.[0]?.text ?? String(res.refusal);
+      return text({
+        error: 'escalation refused after flash failure',
+        flash_failure: String(firstError).slice(0, 200),
+        escalation_refused: refusal,
+      });
+    }
     job = res.view;
     if (job.status === 'running') return text({ ...job, escalated: true, note: `escalated to pro, still running after ${timeout}s; poll with dsh_worker_result` });
     return text({ ...job, escalated: true, flash_failure: String(firstError).slice(0, 200) });
@@ -307,8 +322,8 @@ server.registerTool('dsh_worker_config', {
   },
 }, async ({ reset, ...patch }) => {
   if (reset) {
-    Object.assign(sessionConfig, { enabled: true, ...globalDefaults });
-    sessionConfig.origin_depth_limit = DEFAULT_ORIGIN_DEPTH_LIMIT;
+    const defaults = Object.fromEntries(SESSION_KEYS.map((key) => [key, globalDefaults[key]]));
+    Object.assign(sessionConfig, defaults, { enabled: true, origin_depth_limit: DEFAULT_ORIGIN_DEPTH_LIMIT });
   }
   for (const [k, v] of Object.entries(patch)) if (v !== undefined) sessionConfig[k] = v;
   const reachable = await hubAvailable();
@@ -324,8 +339,9 @@ server.registerTool('dsh_worker_config', {
   const availableModels = available === null
     ? null
     : Object.fromEntries(available.map((p) => [p.id, p.models ?? []]));
+  const sessionView = Object.fromEntries(SESSION_KEYS.map((key) => [key, sessionConfig[key]]));
   return text({
-    ...sessionConfig,
+    ...sessionView,
     hub_reachable: reachable,
     bindings,
     available_providers: available,
