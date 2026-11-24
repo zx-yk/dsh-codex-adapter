@@ -17,6 +17,12 @@ function apiBase() {
 }
 
 let lastProbe = { at: 0, ok: false };
+const JOB_ID = /^[A-Za-z0-9._-]{1,128}$/;
+function safeId(id) {
+  const value = String(id ?? '');
+  if (!JOB_ID.test(value)) throw new Error('invalid job id');
+  return encodeURIComponent(value);
+}
 
 export async function hubAvailable() {
   if (Date.now() - lastProbe.at < 10_000) return lastProbe.ok;
@@ -77,14 +83,17 @@ export const hub = {
     for (;;) {
       const remaining = Math.ceil((deadline - Date.now()) / 1000);
       const slice = waitSeconds <= 0 ? 0 : Math.max(1, Math.min(MAX_POLL_SLICE_SECONDS, remaining));
-      const job = await call(`/jobs/${id}?wait=${slice}`).then((b) => b.job);
-      if (job.status !== 'running' || waitSeconds <= 0 || Date.now() >= deadline) return job;
+      const body = await call(`/jobs/${safeId(id)}?wait=${slice}`);
+      const job = body.job;
+      // A foreign shard snapshot is immutable from this process; waiting again
+      // would busy-loop until the whole budget expired.
+      if (body.foreign || job.status !== 'running' || waitSeconds <= 0 || Date.now() >= deadline) return job;
     }
   },
-  cancel: (id) => call(`/jobs/${id}/cancel`, { method: 'POST' }).then((b) => b.job),
+  cancel: (id) => call(`/jobs/${safeId(id)}/cancel`, { method: 'POST' }).then((b) => b.job),
   // Incremental live events: tool calls, results and assistant text. Served by
   // a short server-side long-poll so a caller can follow a job cheaply.
   events: (id, after = 0, waitSeconds = 0) => call(
-    `/jobs/${id}/events?after=${Math.max(0, Number(after) || 0)}&wait=${Math.max(0, Math.min(300, Number(waitSeconds) || 0))}`,
+    `/jobs/${safeId(id)}/events?after=${Math.max(0, Number(after) || 0)}&wait=${Math.max(0, Math.min(300, Number(waitSeconds) || 0))}`,
   ),
 };

@@ -224,8 +224,21 @@ export function applyGlobalConfigPatch(current, patch) {
     stall_timeout_seconds: [1, 86_400],
     caps_ttl_seconds: [1, 86_400],
   };
+  const shapes = {
+    custom_providers: 'array', extra_models: 'object', upstream_caps: 'object',
+    enabled: 'boolean', escalate_on_failure: 'boolean', flash_auto: 'boolean', pro_auto: 'boolean', codex_global_mcp: 'boolean',
+  };
   for (const [k, v] of Object.entries(patch ?? {})) {
     if (v === undefined || !Object.hasOwn(GLOBAL_CONFIG_DEFAULTS, k)) continue;
+    if (shapes[k] === 'array' && !Array.isArray(v)) {
+      const error = new Error(`${k} must be an array`); error.status = 400; throw error;
+    }
+    if (shapes[k] === 'object' && (!v || typeof v !== 'object' || Array.isArray(v))) {
+      const error = new Error(`${k} must be an object`); error.status = 400; throw error;
+    }
+    if (shapes[k] === 'boolean' && typeof v !== 'boolean') {
+      const error = new Error(`${k} must be a boolean`); error.status = 400; throw error;
+    }
     if (numeric[k]) {
       const n = Number(v);
       if (!Number.isInteger(n) || n < numeric[k][0] || n > numeric[k][1]) {

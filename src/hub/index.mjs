@@ -332,7 +332,7 @@ export class WorkerRegistry {
     return { binding: bound, effort };
   }
 
-  async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset, timeout_seconds }) {
+  async spawn({ task, tier = 'flash', effort = 'max', cwd, source = 'api', provider, model, preset, timeout_seconds, allow_concurrent_cwd: allowConcurrentCwd = false }) {
     if (typeof task !== 'string' || task.trim() === '') {
       throw new Error('task must be a non-empty string');
     }
@@ -369,6 +369,10 @@ export class WorkerRegistry {
     // One canonical form for the job, the advisory lock and the workspace
     // lookup: D:/x and D:\x must map to the same workspace on Windows.
     const cwdPath = canonicalCwd(cwd);
+    if (!allowConcurrentCwd) {
+      const holder = [...this.jobs.values()].find((j) => j.status === 'running' && j.cwd === cwdPath);
+      if (holder) throw new Error(`workspace ${cwdPath} is already held by running job ${holder.id}`);
+    }
     await this.ctx.get('loader')?.await();
 
     const id = `hub-${this.nextId++}-${process.pid.toString(36)}-${Date.now().toString(36)}`;
@@ -546,8 +550,8 @@ export class WorkerRegistry {
       try { disposal = Promise.resolve(handle?.dispose?.()); }
       catch { disposal = Promise.resolve(); }
       disposal
-        .catch(() => {})
-        .finally(() => { job.disposing = false; this.publish(); });
+        .then(() => { job.disposing = false; this.publish(); })
+        .catch(() => { /* keep disposing=true: the runtime may still be alive */ });
       for (const w of job.waiters.splice(0)) w();
     }
     this.pruneSettled(now);
@@ -618,19 +622,18 @@ export class WorkerRegistry {
       job.disposing = true;
       this.publish();
       const hadHandle = job.handle !== null && job.handle !== undefined;
+      let disposed = !hadHandle;
       try {
-        await Promise.race([
-          Promise.resolve(job.handle?.dispose()).catch(() => {}),
-          new Promise((resolve) => setTimeout(resolve, 5000)),
+        disposed = await Promise.race([
+          Promise.resolve(job.handle?.dispose()).then(() => true, () => false),
+          new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
         ]);
       } catch {}
-      finally {
-        // Before agents.create resolves there is no handle to dispose; run()
-        // re-checks the status after create and clears this flag itself.
-        if (hadHandle) job.disposing = false;
-        this.publish();
-        for (const w of job.waiters.splice(0)) w();
-      }
+      // A timed-out/rejected dispose is NOT proof the runtime stopped: keep
+      // disposing=true so hubViewTerminal() cannot release the cwd lock.
+      if (hadHandle && disposed) job.disposing = false;
+      this.publish();
+      for (const w of job.waiters.splice(0)) w();
     }
     return job;
   }
@@ -791,7 +794,7 @@ export async function apply(ctx) {
   // as ready-made entries, so a vision model needs no manual base URL or key.
   let autoProviders = [];
   const mergeAutoProviders = (cfg) => {
-    const user = cfg.custom_providers ?? [];
+    const user = Array.isArray(cfg.custom_providers) ? cfg.custom_providers : [];
     const extra = autoProviders.filter((a) => !user.some((u) => u.id === a.id));
     return extra.length === 0 ? cfg : { ...cfg, custom_providers: [...user, ...extra] };
   };
@@ -968,7 +971,7 @@ export async function apply(ctx) {
           return sendJson(res, 200, { ok: true, ...result });
         } catch (err) {
           if (err instanceof ProcKillRefused) {
-            return sendJson(res, 403, { ok: false, error: err.message, code: err.code, pid: err.pid ?? null, command: err.command ?? null });
+            return sendJson(res, 403, { ok: false, error: err.message, code: err.code, pid: err.pid ?? null });
           }
           return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
         }

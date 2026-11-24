@@ -17,8 +17,9 @@
  * @param {number} spec.timeoutSeconds positive per-job cap
  * @param {{provider?: string, model?: string}} [spec.binding] tier route
  * @param {{chain: unknown[], depth: number}|null} [spec.origin] origin guard hop
+ * @param {boolean} [spec.allowConcurrentCwd] explicit read-only fan-out
  */
-export function hubSpawnSpec({ task, tier, effort, cwd, source, preset, timeoutSeconds, binding, origin }) {
+export function hubSpawnSpec({ task, tier, effort, cwd, source, preset, timeoutSeconds, binding, origin, allowConcurrentCwd }) {
   // A config file edited by hand may carry "1800"; accept that, but never
   // undefined/NaN/0 (the bug this builder exists to prevent).
   const seconds = typeof timeoutSeconds === 'number' ? timeoutSeconds : Number(timeoutSeconds);
@@ -35,5 +36,6 @@ export function hubSpawnSpec({ task, tier, effort, cwd, source, preset, timeoutS
     timeout_seconds: seconds,
     ...(binding ?? {}),
     ...(origin ? { origin_chain: origin.chain, origin_depth: origin.depth } : {}),
+    ...(allowConcurrentCwd ? { allow_concurrent_cwd: true } : {}),
   };
 }

@@ -253,7 +253,7 @@ server.registerTool('dsh_run_worker', {
         spawned = await hub.spawn(hubSpawnSpec({
           task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR,
           preset: presetForTier(t), timeoutSeconds: timeout,
-          binding: bindingForTier(t), origin: origin.origin,
+          binding: bindingForTier(t), origin: origin.origin, allowConcurrentCwd: !!allow_concurrent_cwd,
         }));
         if (lock.holder) updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
         rememberHubOrigin(spawned.id, origin.origin);
@@ -439,7 +439,7 @@ server.registerTool('dsh_spawn_worker', {
       spawned = await hub.spawn(hubSpawnSpec({
         task, tier: t, effort: e, cwd: workDir, source: ORCHESTRATOR,
         preset: presetForTier(t), timeoutSeconds: timeout,
-        binding: bindingForTier(t), origin: origin.origin,
+        binding: bindingForTier(t), origin: origin.origin, allowConcurrentCwd: !!allow_concurrent_cwd,
       }));
       if (lock.holder) updateCwdLockHolder({ cwd: workDir, jobId: spawned.id });
       rememberHubOrigin(spawned.id, origin.origin);
