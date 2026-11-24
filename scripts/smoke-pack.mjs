@@ -255,6 +255,26 @@ for (const name of HOST_RUNTIME_PACKAGES) {
 console.log('[smoke:pack] package.json guard OK: 0 @deepseek-ai/* peers; all ' +
   HOST_RUNTIME_PACKAGES.length + ' host-runtime packages documented in dshHostRuntime; version=' + installedPkg.version);
 
+// Required payload files: a clean install can still be unusable if `files`
+// dropped the client, MCP manifest or legal notice. The host loads lib/client.js
+// from the package export and Claude Code reads .mcp.json, so both are contract.
+const REQUIRED_FILES = [
+  'lib/client.js', 'lib/server.mjs', '.mcp.json',
+  '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json',
+  'cordis.patch.yml', 'worker.cordis.yml', 'NOTICE',
+];
+for (const rel of REQUIRED_FILES) {
+  const full = join(installDir, 'node_modules', PKG_NAME, rel);
+  if (!existsSync(full)) fail('packed tarball is missing required file: ' + rel);
+  if (statSync(full).size === 0) fail('packed tarball contains an empty required file: ' + rel);
+}
+const readme = readFileSync(join(installDir, 'node_modules', PKG_NAME, 'README.md'), 'utf8');
+const readmeVersion = /Latest: <code>([^<]+)<\/code>/.exec(readme)?.[1];
+if (readmeVersion !== installedPkg.version) {
+  fail('version mismatch: README says ' + (readmeVersion ?? 'no Latest badge') + ' but package.json says ' + installedPkg.version);
+}
+console.log('[smoke:pack] payload guard OK: client, MCP manifest, plugin manifests, bundle configs and NOTICE present; README version matches');
+
 // ---------------------------------------------------------------------------
 // 4+5. Both server entry points must serve the full roster. src/ needs the
 // installed zod + MCP SDK; lib/ is the self-contained bundle. Either one

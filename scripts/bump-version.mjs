@@ -6,9 +6,10 @@
 //   node scripts/bump-version.mjs patch      # 0.1.1 -> 0.1.2
 //
 // smoke-pack asserts that package.json, .claude-plugin/plugin.json,
-// src/server.mjs and the built lib/server.mjs all report the same version, so
-// a release that edits only package.json fails the gate. This script keeps the
-// four in sync and rebuilds the bundle; commit the result before publishing.
+// src/server.mjs, the built lib/server.mjs and the README's Latest badge all
+// report the same version, so a release that edits only package.json fails the
+// gate. This script keeps them in sync and rebuilds the bundle; commit the
+// result before publishing.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -55,6 +56,7 @@ const edits = [
   ['package.json', (s) => s.replace(`"version": "${current}"`, `"version": "${next}"`)],
   ['.claude-plugin/plugin.json', (s) => s.replace(`"version": "${current}"`, `"version": "${next}"`)],
   ['src/server.mjs', (s) => s.replace(`version: '${current}'`, `version: '${next}'`)],
+  ['README.md', (s) => s.replace(`Latest: <code>${current}</code>`, `Latest: <code>${next}</code>`)],
 ];
 
 for (const [file, edit] of edits) {

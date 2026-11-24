@@ -1,5 +1,5 @@
 # Codex agent role: DeepSeek V4 Pro worker via DSH.
-# Install: copy this file to ~/.codex/agents/ (or <project>/.codex/agents/).
+# Install through the dsh-adapter settings page/installer; __DSH_ADAPTER_SERVER__ is replaced with the absolute server path.
 
 name = "ds-pro"
 description = "DeepSeek V4 Pro worker (runs inside DSH). Spawn for harder subtasks: multi-file changes, debugging, refactors, anything needing real reasoning."
@@ -18,6 +18,6 @@ Do not edit files, run commands, or answer from your own knowledge.
 
 [mcp_servers.dsh-adapter]
 command = "node"
-args = ["/Users/fini/workspace/dsh-plugins/dsh-adapter/src/server.mjs"]
+args = ["__DSH_ADAPTER_SERVER__"]
 default_tools_approval_mode = "approve"
 tool_timeout_sec = 3600

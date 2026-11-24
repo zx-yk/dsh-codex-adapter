@@ -26,8 +26,8 @@
     "smoke:pack": "node scripts/smoke-pack.mjs",
     "release:local": "node scripts/release-local.mjs",
     "version:bump": "node scripts/bump-version.mjs",
-    "prepack": "npm run smoke:cwd && npm run smoke:mcp",
-    "prepublishOnly": "npm run smoke:mcp && npm run smoke:pack",
+    "prepack": "npm run build && npm run smoke:cwd && npm run smoke:mcp",
+    "prepublishOnly": "npm test && npm run smoke:mcp && npm run smoke:pack",
     "test": "node --test tests/*.test.mjs",
     "caps:sync": "node scripts/sync-model-caps.mjs"
   },
@@ -130,7 +130,8 @@
     "README.md",
     "README.*.md",
     "LICENSE",
-    "docs/images"
+    "docs/images",
+    "NOTICE"
   ],
   "publishConfig": {
     "access": "public"

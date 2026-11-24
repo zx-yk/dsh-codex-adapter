@@ -4,7 +4,7 @@
 #   * a tag push used to start a full install/build/smoke cycle — minutes a
 #     fork does not need to spend on every version marker;
 #   * the publish step can only succeed for the upstream repository, because
-#     npm trusted publishing (OIDC) is bound to ZSeven-W/dsh-crew. In a fork
+#     npm trusted publishing (OIDC) is bound to zx-yk/dsh-codex-adapter. In a fork
 #     the build ran, the publish failed, and nothing was gained.
 #
 # Run it from Actions -> release -> Run workflow when you actually want a
@@ -65,7 +65,13 @@ jobs:
       # still starts: lib/client.js and lib/server.mjs are what the host
       # actually loads, and a stale one would ship unnoticed.
       - name: Build and smoke-test the bundle
-        run: pnpm run build && pnpm run smoke:mcp
+        run: |
+          pnpm run build
+          git diff --exit-code -- lib/
+          pnpm run smoke:mcp
+
+      - name: Run the unit test suite
+        run: pnpm test
 
       # smoke:pack installs the packed tarball the way a user would and is the
       # only check that all four version fields agree.
@@ -86,7 +92,7 @@ jobs:
       # a re-run — or a version first published by hand — turns the release red
       # for a reason nobody needs to act on.
       - name: Publish
-        if: inputs.publish && github.repository == 'ZSeven-W/dsh-crew'
+        if: inputs.publish && github.repository == 'zx-yk/dsh-codex-adapter'
         run: |
           name="$(node -p "require('./package.json').name")"
           pkg="$(node -p "require('./package.json').version")"
@@ -97,5 +103,5 @@ jobs:
           npm publish --access public --tag latest
 
       - name: Skip publish (fork or publish=false)
-        if: ${{ !inputs.publish || github.repository != 'ZSeven-W/dsh-crew' }}
+        if: ${{ !inputs.publish || github.repository != 'zx-yk/dsh-codex-adapter' }}
         run: 'echo "Build verified only. Publish locally with: pnpm run release:local"'

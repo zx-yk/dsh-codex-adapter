@@ -601,7 +601,7 @@ export function installCodex({ home = homedir(), scope, globalMcp = true } = {})
     const launcher = resolveNodeLauncher();
     const rendered = readFileSync(join(srcDir, f), 'utf8')
       .replace(/command = "node"/, () => `command = ${tomlString(launcher.command)}`)
-      .replace(/args = \[.*server\.mjs"\]/, () => `args = [${tomlString(join(ROOT, 'src', 'server.mjs'))}]`);
+      .replace(/^args = \[.*\]$/m, () => `args = [${tomlString(join(ROOT, 'src', 'server.mjs'))}]`);
     writeAtomic(dest, rendered);
     actions.push(`role: ${dest}`);
   }

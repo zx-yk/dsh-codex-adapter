@@ -59,6 +59,13 @@ if (!existsSync(join(ROOT, 'node_modules'))) {
 }
 
 run(pm, ['run', 'build']);
+if (!force) {
+  const builtDirty = capture('git', ['status', '--porcelain', '--', 'lib/']);
+  if (builtDirty) {
+    console.error('\nBuild changed committed artifacts. Commit lib/ before releasing:\n' + builtDirty);
+    process.exit(1);
+  }
+}
 run(pm, ['run', 'smoke:mcp']);
 run(pm, ['run', 'smoke:pack']);
 

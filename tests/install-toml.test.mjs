@@ -74,6 +74,7 @@ test('installCodex writes agent roles that parse', { skip: !hasTomllib && 'pytho
     const parsed = parseToml(readFileSync(join(home, '.codex', 'agents', f), 'utf8'));
     assert.ok(parsed.ok, `${f}: ${parsed.error}`);
     assert.match(parsed.value.mcp_servers['dsh-adapter'].args[0], /server\.mjs$/);
+    assert.doesNotMatch(parsed.value.mcp_servers['dsh-adapter'].args[0], /[\\/]Users[\\/]fini|[\\/]home[\\/]fini/);
   }
 });
 
