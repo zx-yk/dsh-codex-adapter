@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Latest: <code>0.1.39</code> &middot; Requires DSH to be running (hub mode)</sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Latest: <code>0.1.40</code> &middot; Requires DSH to be running (hub mode)</sub>
 </p>
 
 <p align="center">
