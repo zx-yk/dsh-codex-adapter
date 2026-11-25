@@ -11,6 +11,15 @@ const CONFIG_DIR = join(homedir(), '.config', 'dsh-adapter');
 const FILE = join(CONFIG_DIR, 'history.jsonl');
 const MAX_RECORDS = 2000;
 const MAX_BYTES = 8 * 1024 * 1024;
+// Tests and verification scripts used to append their synthetic jobs to the
+// real profile history. Never show those rows to the user.
+const SYNTHETIC_TASKS = new Set(['fixture only', 'Reply with exactly the word: ok']);
+function synthetic(job) {
+  if (!job || typeof job !== 'object') return true;
+  if (job.source === 'verify-script') return true;
+  const task = typeof job.task === 'string' ? job.task.trim() : '';
+  return SYNTHETIC_TASKS.has(task);
+}
 
 const asText = (value) => {
   if (value === null || value === undefined) return null;
@@ -76,6 +85,7 @@ function pruneIfNeeded() {
 }
 
 export function appendHistory(job) {
+  if (synthetic(job)) return;
   mkdirSync(CONFIG_DIR, { recursive: true });
   appendFileSync(FILE, JSON.stringify(historyRecord(job)) + '\n');
   pruneIfNeeded();
@@ -87,7 +97,7 @@ export function readHistory({ limit = 100, offset = 0, tier, status, source } = 
   for (const line of lines() ?? []) {
     let rec;
     try { rec = JSON.parse(line); } catch { continue; }
-    if (!rec?.id) continue;
+    if (!rec?.id || synthetic(rec)) continue;
     if (tier && rec.tier !== tier) continue;
     if (status && rec.status !== status) continue;
     if (source && rec.source !== source) continue;
