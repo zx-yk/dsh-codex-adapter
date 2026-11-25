@@ -1,0 +1,35 @@
+name: github-release
+
+# GitHub Releases are separate from git tags. Pushing a tag updates the Tags
+# page but does not create a Release; this workflow closes that gap. It also
+# supports workflow_dispatch so an existing tag can be backfilled.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish as a GitHub Release (e.g. v0.1.43)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create the release once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release $tag already exists"
+            exit 0
+          fi
+          gh release create "$tag" --verify-tag --generate-notes --title "$tag"
