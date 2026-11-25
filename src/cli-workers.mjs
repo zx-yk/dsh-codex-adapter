@@ -73,6 +73,38 @@ export function killGroup(child, {
   t?.unref?.();
 }
 
+/**
+ * Split a byte stream into NDJSON records. Complete lines are delivered as
+ * they arrive; flush() delivers the final record that had no trailing newline
+ * at EOF. A CLI's last `result` / `is_error` record is often unterminated, and
+ * without the flush it is silently dropped (the job then settles on stale
+ * fallback text or reports success for an errored run).
+ */
+export function createNdjsonLineReader(onLine) {
+  let buf = '';
+  const deliver = (line) => {
+    const trimmed = line.trim();
+    if (trimmed) onLine(trimmed);
+  };
+  return {
+    feed(chunk) {
+      buf += chunk.toString();
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        deliver(buf.slice(0, i));
+        buf = buf.slice(i + 1);
+      }
+    },
+    /** Deliver the remaining unterminated record (idempotent at EOF). */
+    flush() {
+      if (buf === '') return;
+      const rest = buf;
+      buf = '';
+      deliver(rest);
+    },
+  };
+}
+
 function usageToTokens(u) {
   return {
     input: (u?.input_tokens ?? 0) + (u?.cache_read_input_tokens ?? 0),
@@ -244,7 +276,7 @@ function touchActivity(job) {
 function settle(job, { status, error, stopReason }) {
   if (job._settled) return;
   job._settled = true;
-  // Release the cwd lock on EVERY terminal path: exit (done/failed), spawn
+  // Release the cwd lock on EVERY terminal path: close (done/failed), spawn
   // error, timeout kill, cancel — all settle through here (WPC9).
   job._releaseCwdLock?.();
   job._releaseCwdLock = null;
@@ -263,7 +295,10 @@ function settle(job, { status, error, stopReason }) {
   for (const w of job.waiters.splice(0)) w();
 }
 
-export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, source = 'api', effort, origin = null, allowConcurrentCwd = false }) {
+// spawnImpl / killGroupImpl are test seams: production always passes the real
+// spawn/killGroup defaults, so the settlement regression suite can drive a
+// deterministic fake child without a CLI, network or real process signals.
+export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, source = 'api', effort, origin = null, allowConcurrentCwd = false, spawnImpl = spawn, killGroupImpl = killGroup }) {
   const profile = typeof worker === 'string' ? resolveProfile(worker) : worker;
   const workspace = resolve(cwd ?? process.cwd());
   const args = buildArgs(profile, task, timeoutMs, effort);
@@ -311,7 +346,7 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
 
   let child;
   try {
-    child = spawn(profile.cli, args, {
+    child = spawnImpl(profile.cli, args, {
       cwd: workspace,
       // Origin guard: the CLI worker inherits the dispatch chain, so a adapter
       // instance it starts itself continues the chain (WPC9).
@@ -339,7 +374,7 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
   job.pgid = child.pid;
   // cancelJob() in jobs.mjs calls job.harness.close() — same interface as the
   // standalone DSH harness.
-  job.harness = { child, close: async () => killGroup(child) };
+  job.harness = { child, close: async () => killGroupImpl(child) };
 
   job._timer = setTimeout(() => {
     if (job.status !== 'running') return;
@@ -351,33 +386,26 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
     job.endedAt = new Date().toISOString();
     job.liveness = 'stalled';
     publishStatus();
-    killGroup(child);
+    killGroupImpl(child);
     job._timedOut = true;
   }, timeoutMs);
 
   const handleLine = makeLineHandler(profile, job);
-  let buf = '';
-  child.stdout.on('data', (chunk) => {
-    buf += chunk.toString();
-    let i;
-    while ((i = buf.indexOf('\n')) >= 0) {
-      const line = buf.slice(0, i).trim();
-      buf = buf.slice(i + 1);
-      if (!line) continue;
-      job._rawLines.push(line.slice(0, 500));
-      if (job._rawLines.length > RAW_LINE_CAP) job._rawLines.splice(0, job._rawLines.length - RAW_LINE_CAP);
-      touchActivity(job);
-      // Once failed/cancelled/timed-out, ignore what the dying process still
-      // writes: its final error events must not overwrite the timeout/cancel
-      // error we already recorded.
-      if (job.status !== 'running') continue;
-      try {
-        handleLine(job, line, JSON.parse(line));
-      } catch {
-        // Non-JSON stdout line (banner, stray output): keep as evidence, no parse.
-      }
+  const stdoutLines = createNdjsonLineReader((line) => {
+    job._rawLines.push(line.slice(0, 500));
+    if (job._rawLines.length > RAW_LINE_CAP) job._rawLines.splice(0, job._rawLines.length - RAW_LINE_CAP);
+    touchActivity(job);
+    // Once failed/cancelled/timed-out, ignore what the dying process still
+    // writes: its final error events must not overwrite the timeout/cancel
+    // error we already recorded.
+    if (job.status !== 'running') return;
+    try {
+      handleLine(job, line, JSON.parse(line));
+    } catch {
+      // Non-JSON stdout line (banner, stray output): keep as evidence, no parse.
     }
   });
+  child.stdout.on('data', (chunk) => stdoutLines.feed(chunk));
   child.stderr.on('data', (chunk) => {
     job._stderrTail = (job._stderrTail + chunk.toString()).slice(-STDERR_TAIL_BYTES);
   });
@@ -390,40 +418,49 @@ export async function startCliJob({ worker, task, cwd, timeoutMs = DEFAULT_TIMEO
     });
   });
 
-  child.on('exit', (code, signal) => {
-    const timedOut = job._timedOut === true;
-    if (job.status === 'running') {
-      if (timedOut) {
-        settle(job, { status: 'failed', stopReason: 'timeout' });
-      } else if (job._agyStatus && job._agyStatus !== 'SUCCESS') {
-        settle(job, { status: 'failed', stopReason: job._agyStatus });
-      } else if (job._grokIsError) {
-        settle(job, { status: 'failed', stopReason: 'error' });
-      } else if (job.result != null && code === 0) {
-        job.stopReason = job._stopReason ?? 'completed';
-        settle(job, { status: 'done', stopReason: job.stopReason });
-      } else if (job.result != null && code !== 0) {
-        settle(job, {
-          status: 'failed',
-          stopReason: job._stopReason ?? `exit code ${code}`,
-          error: job._stderrTail.trim().slice(-400) || `CLI exited with code ${code}`,
-        });
-      } else if (code === 0) {
-        // Stream ended without a result event: fall back to accumulated text
-        // and the last per-message usage we saw.
-        job.result = cliFallbackText(job);
-        if (job._msgUsage) addTokensFromUsage(job, job._msgUsage);
-        job.stopReason = job._stopReason ?? 'completed';
-        settle(job, { status: 'done', stopReason: job.stopReason });
-      } else {
-        settle(job, {
-          status: 'failed',
-          stopReason: `exit code ${code}${signal ? ` (signal ${signal})` : ''}`,
-          error: job._stderrTail.trim().slice(-400) || `CLI exited with code ${code}`,
-        });
-      }
+  // Settle on 'close', not 'exit': Node may emit buffered stdout data after
+  // 'exit' and only emits 'close' once both pipes are drained. Deciding
+  // done/failed at 'exit' therefore raced the final result/is_error record
+  // (and ignored a last unterminated JSON record entirely).
+  child.on('close', (code, signal) => {
+    // Consume the remaining stdout BEFORE the status decision. flush() is a
+    // no-op when the stream ended on a newline; otherwise it parses the final
+    // record that had no trailing newline.
+    stdoutLines.flush();
+    if (job.status !== 'running') {
+      // Cancelled / timed out / spawn-failed: keep the terminal state already
+      // recorded; just release the lock and wake waiters once.
+      settle(job, { status: job.status });
+      return;
+    }
+    if (job._timedOut === true) {
+      settle(job, { status: 'failed', stopReason: 'timeout' });
+    } else if (job._agyStatus && job._agyStatus !== 'SUCCESS') {
+      settle(job, { status: 'failed', stopReason: job._agyStatus });
+    } else if (job._grokIsError) {
+      settle(job, { status: 'failed', stopReason: 'error' });
+    } else if (job.result != null && code === 0) {
+      job.stopReason = job._stopReason ?? 'completed';
+      settle(job, { status: 'done', stopReason: job.stopReason });
+    } else if (job.result != null && code !== 0) {
+      settle(job, {
+        status: 'failed',
+        stopReason: job._stopReason ?? `exit code ${code}`,
+        error: job._stderrTail.trim().slice(-400) || `CLI exited with code ${code}`,
+      });
+    } else if (code === 0) {
+      // Stream ended without a result event: fall back to accumulated text
+      // and the last per-message usage we saw.
+      job.result = cliFallbackText(job);
+      if (job._msgUsage) addTokensFromUsage(job, job._msgUsage);
+      job.stopReason = job._stopReason ?? 'completed';
+      settle(job, { status: 'done', stopReason: job.stopReason });
     } else {
-      settle(job, { status: job.status }); // cancelled path: keep the cancellation
+      settle(job, {
+        status: 'failed',
+        stopReason: `exit code ${code}${signal ? ` (signal ${signal})` : ''}`,
+        error: job._stderrTail.trim().slice(-400) || `CLI exited with code ${code}`,
+      });
     }
   });
 
