@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Текущий релиз плагина: <code>0.1.43</code> &middot; Проверено с DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> &middot; Текущий релиз плагина: <code>0.1.44</code> &middot; Проверено с DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
