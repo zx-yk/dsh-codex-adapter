@@ -2,7 +2,7 @@
 // global worker configuration, and the live jobs table.
 // Talks only to the plugin's own loopback routes.
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Component, Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { persistConfigPatch } from './config-save.mjs';
 import { historyStatItems } from './history-view.mjs';
@@ -447,6 +447,24 @@ function elapsed(startedAt: string, endedAt?: string | null) {
 }
 function ktok(n: number) { return n >= 1000 ? `${Math.round(n / 100) / 10}k` : `${n}`; }
 
+class PanelBoundary extends Component<{ children: any }, { error: any }> {
+  state = { error: null as any };
+  static getDerivedStateFromError(error: any) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 12, color: '#f85149', fontSize: 12, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+          DSH Adapter panel error. Open the browser console for the stack.
+          {'\n\n' + String(this.state.error?.stack ?? this.state.error)}
+          {'\n'}
+          <button type="button" style={{ ...S.btn, marginTop: 8 }} onClick={() => this.setState({ error: null })}>Retry</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function WorkersPanel({ ctx }: { ctx: any }) {
   const locale = useSyncExternalStore(
     (notify: () => void) => ctx.on('locale/change', notify),
@@ -565,7 +583,8 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     window.addEventListener('resize', close);
     return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
   }, []);
-  const mergeJobs = useCallback((fresh: any[]) => {
+  const mergeJobs = useCallback((incoming: any[]) => {
+    const fresh = Array.isArray(incoming) ? incoming : [];
     const ids = new Set((fresh ?? []).map((j) => j?.id).filter(Boolean));
     const keep = (id: string) => ids.has(id) || id === expandedJobRef.current || !!ghostsRef.current[id];
     setJobEvents((prev) => {
@@ -754,7 +773,7 @@ function WorkersPanel({ ctx }: { ctx: any }) {
     void get('/history?limit=100').then((r) => {
       // A slower earlier request must not overwrite a newer one or clear its
       // loading flag; only the newest sequence owns the state.
-      if (r.ok && historySeq.current === seq) { setHistoryRows(r.records ?? []); setHistoryAgg(r.stats ?? null); }
+      if (r.ok && historySeq.current === seq) { setHistoryRows(Array.isArray(r.records) ? r.records : []); setHistoryAgg(r.stats ?? null); }
     }).catch(() => {}).finally(() => {
       if (historySeq.current === seq) setHistoryLoading(false);
     });
@@ -1670,7 +1689,7 @@ export function apply(ctx: any): void {
             return `${base} ${CIRCLED[runningCount - 1] ?? `(${runningCount})`}`;
           },
         },
-        () => <WorkersPanel ctx={ctx} />,
+        () => <PanelBoundary><WorkersPanel ctx={ctx} /></PanelBoundary>,
       );
     }
     const poll = async () => {
