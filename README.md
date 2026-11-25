@@ -228,6 +228,8 @@ The MCP server is a thin client: it holds no model credentials and never calls a
 
 ## Development
 
+Release steps and the GitHub Releases checklist: [docs/RELEASING.md](./docs/RELEASING.md).
+
 ```bash
 pnpm install
 pnpm test            # unit + wiring tests (node:test)
