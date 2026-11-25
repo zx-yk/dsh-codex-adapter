@@ -33,3 +33,7 @@ jobs:
             exit 0
           fi
           gh release create "$tag" --verify-tag --generate-notes --title "$tag"
+          latest_tag="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          if [ "$tag" != "$latest_tag" ]; then
+            gh release edit "$tag" --latest=false
+          fi

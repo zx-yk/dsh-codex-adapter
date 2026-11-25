@@ -46,4 +46,15 @@ for (const tag of tags) {
   created += 1;
   console.log(`created ${tag}`);
 }
+// Creating older tags after newer ones makes GitHub mark the last-created
+// (lowest) release as "Latest". Explicitly restore the highest tag.
+const newest = tags[0];
+if (newest) {
+  const all = await (await api('/releases?per_page=100')).json();
+  const rel = Array.isArray(all) ? all.find((r) => r.tag_name === newest) : null;
+  if (rel) {
+    await api(`/releases/${rel.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ make_latest: 'true' }) });
+    console.log(`latest release set to ${newest}`);
+  }
+}
 console.log(`done: ${created} release(s) created, ${existing.size} already present`);
