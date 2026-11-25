@@ -24,8 +24,15 @@ const api = (path, init = {}) => fetch(`https://api.github.com/repos/${REPO}${pa
   },
 });
 
-const tags = execFileSync('git', ['tag', '--list', 'v*', '--sort=-version:refname'], { encoding: 'utf8' })
+const tags = execFileSync('git', ['tag', '--list', 'v0.1.*', '--sort=version:refname'], { encoding: 'utf8' })
   .trim().split('\n').filter(Boolean);
+const notesFor = (tag, prev) => {
+  const range = prev ? `${prev}..${tag}` : tag;
+  const lines = execFileSync('git', ['log', '--pretty=format:%h%x09%s', range], { encoding: 'utf8' })
+    .trim().split('\n').filter(Boolean)
+    .filter((line) => !/^\w+\trelease: v/.test(line) && !/^\w+\tMerge /.test(line));
+  return ['## Changes', ...(lines.length ? lines.map((line) => '- ' + line.replace('\t', ' — ')) : ['- Version marker only.']), '', `**Full Changelog**: https://github.com/${REPO}/compare/${prev ?? tag}...${tag}`].join('\n');
+};
 const existing = new Set();
 for (let page = 1; ; page++) {
   const res = await api(`/releases?per_page=100&page=${page}`);
@@ -35,12 +42,14 @@ for (let page = 1; ; page++) {
   if (batch.length < 100) break;
 }
 let created = 0;
-for (const tag of tags) {
+for (let i = 0; i < tags.length; i++) {
+  const tag = tags[i];
   if (existing.has(tag)) continue;
+  const prev = tags[i - 1];
   const res = await api('/releases', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ tag_name: tag, name: tag, generate_release_notes: true, draft: false, prerelease: false }),
+    body: JSON.stringify({ tag_name: tag, name: tag, body: notesFor(tag, prev), draft: false, prerelease: false }),
   });
   if (!res.ok) throw new Error(`create ${tag}: HTTP ${res.status} ${await res.text()}`);
   created += 1;

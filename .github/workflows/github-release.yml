@@ -32,8 +32,17 @@ jobs:
             echo "release $tag already exists"
             exit 0
           fi
-          gh release create "$tag" --verify-tag --generate-notes --title "$tag"
-          latest_tag="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          prev="$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)"
+          range="${prev:+$prev..}$tag"
+          git log --pretty=format:'- %h — %s' "$range" | grep -vE '^(.*release: v|.*Merge )' > /tmp/changes.md || true
+          {
+            echo "## Changes"
+            if [ -s /tmp/changes.md ]; then cat /tmp/changes.md; else echo "- Version marker only."; fi
+            echo
+            echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev:-$tag}...$tag"
+          } > /tmp/body.md
+          gh release create "$tag" --verify-tag --title "$tag" --notes-file /tmp/body.md
+          latest_tag="$(git tag --list 'v0.1.*' --sort=-version:refname | head -n 1)"
           if [ "$tag" != "$latest_tag" ]; then
             gh release edit "$tag" --latest=false
           fi
