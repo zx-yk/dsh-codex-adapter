@@ -12,9 +12,13 @@ const FILE = join(CONFIG_DIR, 'history.jsonl');
 const MAX_RECORDS = 2000;
 const MAX_BYTES = 8 * 1024 * 1024;
 
+const asText = (value) => {
+  if (value === null || value === undefined) return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
+};
 const clip = (value, max) => {
-  if (typeof value !== 'string') return value ?? null;
-  return value.length > max ? value.slice(0, max) + '…' : value;
+  const text = asText(value);
+  return text === null || text.length <= max ? text : text.slice(0, max) + '…';
 };
 
 /** The durable subset of a job, with long text clipped. */
@@ -22,16 +26,16 @@ export function historyRecord(job) {
   return {
     id: job.id,
     sessionId: job.sessionId ?? null,
-    tier: job.tier ?? null,
-    provider: job.provider ?? null,
-    model: job.model ?? null,
-    effort: job.effort ?? null,
-    status: job.status ?? null,
-    source: job.source ?? null,
-    cwd: job.cwd ?? null,
-    mode: job.mode ?? null,
-    backend: job.backend ?? null,
-    profile: job.profile ?? null,
+    tier: asText(job.tier),
+    provider: asText(job.provider),
+    model: asText(job.model),
+    effort: asText(job.effort),
+    status: asText(job.status),
+    source: asText(job.source),
+    cwd: asText(job.cwd),
+    mode: asText(job.mode),
+    backend: asText(job.backend),
+    profile: asText(job.profile),
     task: clip(job.task, 400),
     result: clip(job.result, 1500),
     error: clip(job.error, 400),
@@ -87,6 +91,11 @@ export function readHistory({ limit = 100, offset = 0, tier, status, source } = 
     if (tier && rec.tier !== tier) continue;
     if (status && rec.status !== status) continue;
     if (source && rec.source !== source) continue;
+    // Old records may contain arrays/objects in text columns (the empty-object
+    // task once crashed React with error #31). Normalize on read as well as write.
+    for (const key of ['task', 'result', 'error', 'model', 'tier', 'effort', 'status', 'source', 'backend', 'profile']) {
+      if (rec[key] !== undefined && rec[key] !== null && typeof rec[key] !== 'string') rec[key] = asText(rec[key]);
+    }
     records.push(rec);
   }
   records.reverse();

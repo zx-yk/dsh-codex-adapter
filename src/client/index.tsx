@@ -1513,9 +1513,12 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                     const start = Date.parse(r.startedAt ?? '');
                     const end = Date.parse(r.endedAt ?? '');
                     const secs = Number.isFinite(start) && Number.isFinite(end) && end >= start ? ((end - start) / 1000).toFixed(1) + 's' : '—';
-                    const status = historyStatusMeta(r.status);
-                    const model = `${r.model ?? '—'}${r.effort ? ` @${r.effort}` : ''}`;
-                    const task = r.task ?? '';
+                    const status = historyStatusMeta(typeof r.status === 'string' ? r.status : '');
+                    const modelText = typeof r.model === 'string' ? r.model : '—';
+                    const effortText = typeof r.effort === 'string' ? r.effort : '';
+                    const model = `${modelText}${effortText ? ` @${effortText}` : ''}`;
+                    const task = typeof r.task === 'string' ? r.task : (r.task === null || r.task === undefined ? '' : JSON.stringify(r.task));
+                    const tierText = typeof r.tier === 'string' ? r.tier : (r.tier === null || r.tier === undefined ? '—' : JSON.stringify(r.tier));
                     return (
                       <tr key={r.id} style={{ borderTop: '1px solid rgba(128,128,128,0.14)', transition: 'background 120ms ease' }}
                         onMouseEnter={(e: any) => { e.currentTarget.style.background = 'rgba(128,128,128,0.05)'; }}
@@ -1533,11 +1536,11 @@ function WorkersPanel({ ctx }: { ctx: any }) {
                         </td>
                         <td style={{ padding: '6px 8px', minWidth: 0, overflow: 'hidden' }} title={model}>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 0 }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.model ?? '—'}</span>
-                            {r.effort && <span style={{ flexShrink: 0, fontSize: 10.5, opacity: 0.55 }}>@{r.effort}</span>}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{modelText}</span>
+                            {effortText && <span style={{ flexShrink: 0, fontSize: 10.5, opacity: 0.55 }}>@{effortText}</span>}
                           </div>
                         </td>
-                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{r.tier ?? '—'}</td>
+                        <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{tierText}</td>
                         <td style={{ padding: '6px 8px', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{secs}</td>
                       </tr>
                     );
