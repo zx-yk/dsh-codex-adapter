@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> • 目前外掛程式版本: <code>0.1.44</code> • 測試版本 DSH <code>0.1.1-rc.1</code></sub>
+  <sub>npm: <code>@zoraxylia/dsh-codex-adapter</code> • 目前外掛程式版本: <code>0.1.45</code> • 測試版本 DSH <code>0.1.1-rc.1</code></sub>
 </p>
 
 <p align="center">
